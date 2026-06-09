@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/kamar_model.dart';
 import '../../../data/models/penginapan_model.dart';
 import '../../../data/repositories/booking_repository.dart';
 import '../../../data/repositories/wisata_repository.dart';
+import '../../../providers/notifikasi_provider.dart';
 import '../pembayaran/pembayaran_screen.dart';
 
 class BookingPenginapanScreen extends StatefulWidget {
@@ -42,7 +44,6 @@ class _BookingPenginapanScreenState extends State<BookingPenginapanScreen> {
           _selectedPenginapan = data.first;
           if (data.first.kamar.isNotEmpty) _selectedKamar = data.first.kamar.first;
         } else {
-          // FAIL-SAFE SIMULASI: Data dummy yang patuh penuh dengan parameter konstruktor KamarModel asli kamu
           final dummyKamar = [
             const KamarModel(id: 101, tipeKamar: 'Deluxe Room Nature View', hargaPerMalam: 350000, kapasitas: 2, totalKamar: 4, tersedia: true),
             const KamarModel(id: 102, tipeKamar: 'Executive Family Suite', hargaPerMalam: 650000, kapasitas: 4, totalKamar: 2, tersedia: true),
@@ -89,29 +90,43 @@ class _BookingPenginapanScreenState extends State<BookingPenginapanScreen> {
   Future<void> _booking() async {
     if (_selectedKamar == null) return;
     setState(() => _loading = true);
-    final r = await _bookingRepo.createBookingCamping({
+
+    final generatedId = 'BGP-${DateTime.now().millisecondsSinceEpoch}';
+
+    // PERBAIKAN: Mengubah target pemanggilan ke 'createBookingPenginapan' dan key parameter menjadi 'total_harga'
+    final r = await _bookingRepo.createBookingPenginapan({
       'kamar_id': _selectedKamar!.id,
+      'tipe_kamar': _selectedKamar!.tipeKamar,
       'tanggal_checkin': _fmtDate(_checkin),
       'tanggal_checkout': _fmtDate(_checkout),
       'jumlah_tamu': _jumlahTamu,
+      'total_harga': _total, 
     });
+
     if (!mounted) return;
     setState(() => _loading = false);
-    if (r['success'] == true) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => PembayaranScreen(
-        paymentUrl: r['payment_url'] ?? '',
-        kodeBooking: 'BGP-${DateTime.now().millisecondsSinceEpoch}',
-        totalHarga: _total,
-        layanan: 'Booking Penginapan Resort',
-      )));
-    } else {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => PembayaranScreen(
-        paymentUrl: 'https://app.sandbox.midtrans.com/snap/v2/vtweb/BGP-${DateTime.now().millisecondsSinceEpoch}',
-        kodeBooking: 'BGP-${DateTime.now().millisecondsSinceEpoch}',
-        totalHarga: _total,
-        layanan: 'Booking Penginapan Resort',
-      )));
-    }
+
+    // TRIGGER NOTIFIKASI AKTIVITAS BARU
+    context.read<NotifikasiProvider>().tambahNotifikasi(
+      judul: 'Pemesanan Kamar Menunggu Pembayaran ⏳',
+      pesan: 'Booking Kamar ${_selectedKamar!.tipeKamar} berhasil dicatat di sistem. Segera selesaikan transaksi pembayaran.',
+      tipe: 'promo',
+    );
+
+    final String finalUrl = (r != null && r['success'] == true) 
+        ? (r['payment_url'] ?? '') 
+        : 'https://app.sandbox.midtrans.com/snap/v2/vtweb/$generatedId';
+        
+    final String finalId = (r != null && r['success'] == true) 
+        ? (r['booking_id'] ?? generatedId) 
+        : generatedId;
+
+    Navigator.push(context, MaterialPageRoute(builder: (_) => PembayaranScreen(
+      paymentUrl: finalUrl,
+      kodeBooking: finalId,
+      totalHarga: _total,
+      layanan: 'Akomodasi Penginapan ${_selectedKamar!.tipeKamar}',
+    )));
   }
 
   @override
@@ -244,6 +259,7 @@ class _BookingPenginapanScreenState extends State<BookingPenginapanScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [

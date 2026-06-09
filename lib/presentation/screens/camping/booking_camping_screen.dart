@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/paket_camping_model.dart';
 import '../../../data/repositories/booking_repository.dart';
 import '../../../data/repositories/wisata_repository.dart';
+import '../../../providers/notifikasi_provider.dart';
 import '../pembayaran/pembayaran_screen.dart';
 
 class BookingCampingScreen extends StatefulWidget {
@@ -40,7 +42,6 @@ class _BookingCampingScreenState extends State<BookingCampingScreen> {
           _pakets = p;
           _selected = p.first;
         } else {
-          // FAIL-SAFE: Menggunakan fungsi dummyList bawaan dari file PaketCampingModel kamu agar 100% klop
           _pakets = PaketCampingModel.dummyList();
           _selected = _pakets.first;
         }
@@ -80,29 +81,44 @@ class _BookingCampingScreenState extends State<BookingCampingScreen> {
   Future<void> _booking() async {
     if (_selected == null) return;
     setState(() => _loading = true);
+    
+    // GENERATE ID HULU AGAR SINKRON ANTARA RIWAYAT DAN NOTIFIKASI
+    final generatedId = 'BCP-${DateTime.now().millisecondsSinceEpoch}';
+
+    // PERBAIKAN: Mengirim parameter 'total_harga' dan nama paket yang valid ke repositori pusat
     final r = await _bookingRepo.createBookingCamping({
       'paket_camping_id': _selected!.id,
+      'nama_paket': _selected!.namaPaket,
       'tanggal_checkin': _fmtDate(_checkin),
       'tanggal_checkout': _fmtDate(_checkout),
       'jumlah_tamu': _jumlahTamu,
+      'total_harga': _total, 
     });
+
     if (!mounted) return;
     setState(() => _loading = false);
-    if (r['success'] == true) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => PembayaranScreen(
-        paymentUrl: r['payment_url'] ?? '',
-        kodeBooking: 'BCP-${DateTime.now().millisecondsSinceEpoch}',
-        totalHarga: _total,
-        layanan: _selected?.namaPaket ?? 'Booking Area Camping',
-      )));
-    } else {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => PembayaranScreen(
-        paymentUrl: 'https://app.sandbox.midtrans.com/snap/v2/vtweb/BCP-${DateTime.now().millisecondsSinceEpoch}',
-        kodeBooking: 'BCP-${DateTime.now().millisecondsSinceEpoch}',
-        totalHarga: _total,
-        layanan: _selected?.namaPaket ?? 'Booking Area Camping',
-      )));
-    }
+
+    // TRIGGER NOTIFIKASI AKTIVITAS BARU
+    context.read<NotifikasiProvider>().tambahNotifikasi(
+      judul: 'Sewa Camp Menunggu Pembayaran ⏳',
+      pesan: 'Booking ${_selected!.namaPaket} berhasil dibuat. Silakan selesaikan pembayaran tagihan Anda.',
+      tipe: 'paket',
+    );
+
+    final String finalUrl = (r != null && r['success'] == true) 
+        ? (r['payment_url'] ?? '') 
+        : 'https://app.sandbox.midtrans.com/snap/v2/vtweb/$generatedId';
+        
+    final String finalId = (r != null && r['success'] == true) 
+        ? (r['booking_id'] ?? generatedId) 
+        : generatedId;
+
+    Navigator.push(context, MaterialPageRoute(builder: (_) => PembayaranScreen(
+      paymentUrl: finalUrl,
+      kodeBooking: finalId,
+      totalHarga: _total,
+      layanan: _selected?.namaPaket ?? 'Booking Area Camping',
+    )));
   }
 
   @override
