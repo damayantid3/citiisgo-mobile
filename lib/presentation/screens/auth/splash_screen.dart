@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart'; // 1. Tambahkan import provider
 import '../../../core/config/app_colors.dart';
-import '../../../data/repositories/booking_repository.dart';
-import '../../../data/repositories/auth_repository.dart';
-import '../../../data/repositories/wisata_repository.dart';
+import '../../../providers/auth_provider.dart'; // 2. Arahkan import ke AuthProvider
 import '../home/home_screen.dart';
 import 'login_screen.dart';
 
-// ══════════════════════════════════════════════════════════════
-// SPLASH SCREEN
-// ══════════════════════════════════════════════════════════════
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
   @override
@@ -34,14 +30,22 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkAuth() async {
+    // Memberikan waktu agar animasi splash selesai bergulir
     await Future.delayed(const Duration(milliseconds: 2200));
     if (!mounted) return;
-    final isLoggedIn = await AuthRepository().isLoggedIn();
+
+    // 3. Eksekusi pengecekan sesi & pemuatan data user secara global
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await authProvider.checkAuth();
+
+    if (!mounted) return;
+
+    // 4. Arahkan halaman berdasarkan status login yang valid di Provider
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
         pageBuilder: (_, __, ___) =>
-            isLoggedIn ? const HomeScreen() : const LoginScreen(),
+            authProvider.isLoggedIn ? const HomeScreen() : const LoginScreen(),
         transitionDuration: const Duration(milliseconds: 500),
         transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),
@@ -54,6 +58,12 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Mengatur warna status bar di atas layar agar senada dengan gradien splash
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ));
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(

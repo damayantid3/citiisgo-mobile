@@ -1,242 +1,163 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/config/app_colors.dart';
-import '../../../data/models/notifikasi_model.dart';
-import '../../../data/repositories/booking_repository.dart';
+import '../../../providers/notifikasi_provider.dart'; // Import Provider Pusat
 
-class NotifikasiScreen extends StatefulWidget {
+class NotifikasiScreen extends StatelessWidget {
   const NotifikasiScreen({super.key});
-  @override
-  State<NotifikasiScreen> createState() => _NotifikasiScreenState();
-}
-
-class _NotifikasiScreenState extends State<NotifikasiScreen> {
-  final _repo = BookingRepository();
-  List<NotifikasiModel> _notifs = [];
-  bool _loading = true;
-
-  // Demo data jika API belum tersedia
-  final List<Map<String, dynamic>> _demoNotifs = [
-    {
-      'id': 1, 'judul': '✅ Pembayaran Berhasil!',
-      'pesan': 'Reservasi tiket Curug Cimedang (CG-3021) telah dikonfirmasi. Selamat berwisata!',
-      'tipe': 'success', 'is_read': false, 'created_at': '2 menit lalu'
-    },
-    {
-      'id': 2, 'judul': '⛺ Booking Camping Dikonfirmasi',
-      'pesan': 'Booking camping Bukit Teletubbies (CGC-A1B2) paket Keluarga Premium telah dikonfirmasi oleh pengelola.',
-      'tipe': 'booking', 'is_read': false, 'created_at': '1 jam lalu'
-    },
-    {
-      'id': 3, 'judul': '🎉 Promo Spesial Weekend!',
-      'pesan': 'Dapatkan diskon 30% untuk tiket masuk semua wisata alam setiap Sabtu-Minggu bulan ini. Gunakan kode: WEEKEND30',
-      'tipe': 'info', 'is_read': false, 'created_at': '3 jam lalu'
-    },
-    {
-      'id': 4, 'judul': '⏰ Pengingat Kunjungan',
-      'pesan': 'Besok Anda memiliki jadwal kunjungan ke Pantai Sindangkerta. Jangan lupa persiapkan perlengkapan Anda!',
-      'tipe': 'warning', 'is_read': true, 'created_at': '1 hari lalu'
-    },
-    {
-      'id': 5, 'judul': '⭐ Berikan Ulasan Anda',
-      'pesan': 'Bagaimana pengalaman Anda di Situ Gede? Berikan ulasan dan bantu wisatawan lain menemukan destinasi terbaik.',
-      'tipe': 'info', 'is_read': true, 'created_at': '2 hari lalu'
-    },
-    {
-      'id': 6, 'judul': '🎒 Sewa Peralatan Siap',
-      'pesan': 'Peralatan camping Anda (SGS-001) telah disiapkan. Silakan ambil di lokasi wisata saat tiba.',
-      'tipe': 'success', 'is_read': true, 'created_at': '3 hari lalu'
-    },
-    {
-      'id': 7, 'judul': '🏨 Kamar Tersedia',
-      'pesan': 'Kamar Suite View Air Terjun di Cimedang Lodge kini tersedia untuk tanggal pilihan Anda. Segera booking!',
-      'tipe': 'info', 'is_read': true, 'created_at': '5 hari lalu'
-    },
-    {
-      'id': 8, 'judul': '💳 Pembayaran Menunggu',
-      'pesan': 'Booking camping Anda (CGC-C3D4) belum dibayar. Selesaikan pembayaran sebelum batas waktu: 23:59 hari ini.',
-      'tipe': 'warning', 'is_read': true, 'created_at': '1 minggu lalu'
-    },
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (mounted) setState(() => _loading = false);
-  }
-
-  Future<void> _markAllRead() async {
-    setState(() {
-      for (var n in _demoNotifs) n['is_read'] = true;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Semua notifikasi ditandai sudah dibaca'),
-      backgroundColor: AppColors.primaryGreen,
-      behavior: SnackBarBehavior.floating,
-    ));
-  }
-
-  void _markOneRead(int id) {
-    setState(() {
-      final idx = _demoNotifs.indexWhere((n) => n['id'] == id);
-      if (idx != -1) _demoNotifs[idx]['is_read'] = true;
-    });
-  }
-
-  int get _unreadCount => _demoNotifs.where((n) => !(n['is_read'] as bool)).length;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Column(children: [
-        // Header
-        Container(
-          decoration: const BoxDecoration(
-            gradient: AppColors.heroGradient,
-            borderRadius: BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
-          ),
-          child: SafeArea(bottom: false, child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-            child: Row(children: [
-              const Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('🔔 Notifikasi', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-                  Text('Pemberitahuan terbaru untuk Anda', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                ]),
-              ),
-              if (_unreadCount > 0) GestureDetector(
-                onTap: _markAllRead,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(.15), borderRadius: BorderRadius.circular(20)),
-                  child: Row(children: [
-                    const Icon(Icons.done_all_rounded, color: Colors.white, size: 15),
-                    const SizedBox(width: 5),
-                    const Text('Tandai semua', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w600)),
-                  ]),
+      
+      // 1. HEADER UTAMA DENGAN BUTTON BACK & BUTTON TANDAI DIBACA
+      appBar: AppBar(
+        backgroundColor: AppColors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary, size: 18),
+          onPressed: () => Navigator.pop(context), // Kembali ke Beranda Utama
+        ),
+        title: Text(
+          'Notifikasi Aktivitas',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.textPrimary),
+        ),
+        centerTitle: false,
+        actions: [
+          // Tombol muncul otomatis jika ada pesan yang belum dibaca
+          Consumer<NotifikasiProvider>(
+            builder: (context, notifP, _) {
+              final adaUnread = notifP.listNotifikasi.any((n) => !n.isRead);
+              if (!adaUnread) return const SizedBox();
+              return TextButton(
+                onPressed: () => notifP.tandaiSemuaDibaca(),
+                child: Text(
+                  'Tandai Dibaca',
+                  style: GoogleFonts.plusJakartaSans(color: AppColors.primaryGreen, fontWeight: FontWeight.w700, fontSize: 12),
                 ),
-              ),
-            ]),
-          )),
-        ),
+              );
+            },
+          ),
+        ],
+      ),
+      
+      // 2. BODY UTAMA MENGGUNAKAN CONSUMER UNTUK MENDENGARKAN REALTIME STATE
+      body: Consumer<NotifikasiProvider>(
+        builder: (context, notifP, child) {
+          final listNotif = notifP.listNotifikasi;
 
-        // Unread badge
-        if (_unreadCount > 0) Container(
-          color: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: AppColors.lightOrange, borderRadius: BorderRadius.circular(20)),
-              child: Row(children: [
-                Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.primaryOrange, shape: BoxShape.circle)),
-                const SizedBox(width: 6),
-                Text('$_unreadCount notifikasi belum dibaca', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primaryOrange)),
-              ]),
-            ),
-          ]),
-        ),
-
-        Expanded(child: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGreen))
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              color: AppColors.primaryGreen,
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-                itemCount: _demoNotifs.length,
-                itemBuilder: (_, i) => _notifCard(_demoNotifs[i]),
+          // Jika tidak ada aktivitas pemesanan atau promo
+          if (listNotif.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 70, height: 70,
+                    decoration: const BoxDecoration(color: AppColors.lightGreen, shape: BoxShape.circle),
+                    child: const Icon(Icons.notifications_off_rounded, size: 32, color: AppColors.primaryGreen),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Belum ada notifikasi baru',
+                    style: GoogleFonts.plusJakartaSans(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Aktivitas pemesanan & promo akan muncul di sini.',
+                    style: GoogleFonts.plusJakartaSans(color: AppColors.textMuted, fontSize: 12),
+                  ),
+                ],
               ),
-            ),
-        ),
-      ]),
+            );
+          }
+
+          // Render list notifikasi yang diambil dari NotifikasiProvider terpusat
+          return ListView.builder(
+            physics: const BouncingScrollPhysics(),
+            itemCount: listNotif.length,
+            itemBuilder: (context, index) {
+              final notif = listNotif[index];
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                decoration: BoxDecoration(
+                  // Jika belum dibaca (isRead = false), warnanya akan hijau muda transparan transisi cerah
+                  color: notif.isRead ? AppColors.white : AppColors.lightGreen.withOpacity(0.25),
+                  border: const Border(bottom: BorderSide(color: AppColors.borderColor, width: 0.6)),
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  leading: CircleAvatar(
+                    backgroundColor: _getIconColor(notif.tipe),
+                    radius: 22,
+                    child: Icon(_getIconData(notif.tipe), color: Colors.white, size: 18),
+                  ),
+                  title: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          notif.judul,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: notif.isRead ? FontWeight.w600 : FontWeight.w800,
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        notif.waktu,
+                        style: GoogleFonts.plusJakartaSans(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 6.0),
+                    child: Text(
+                      notif.pesan,
+                      style: GoogleFonts.plusJakartaSans(fontSize: 12, color: AppColors.textSecondary, height: 1.35),
+                    ),
+                  ),
+                  onTap: () {
+                    // Ketika item diklik, otomatis status berubah jadi "Read" (Warna memudar jadi putih)
+                    notifP.tandaiSatuDibaca(notif.id);
+                  },
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
-  Widget _notifCard(Map<String, dynamic> n) {
-    final isRead   = n['is_read'] as bool;
-    final tipe     = n['tipe'] as String;
+  Color _getIconColor(String tipe) {
+    switch (tipe) {
+      case 'sukses':
+        return AppColors.primaryGreen; // Ikon lingkaran Hijau untuk sukses booking
+      case 'batal':
+        return AppColors.danger; // Ikon lingkaran Merah untuk pembatalan transaksi
+      case 'paket':
+        return AppColors.primaryOrange; // Ikon lingkaran Orange untuk info paket/sewa
+      case 'promo':
+      default:
+        return Colors.blue.withOpacity(0.8); // Promo / Info Umum
+    }
+  }
 
-    final tipeConfig = {
-      'success': {'color': AppColors.primaryGreen,  'bg': AppColors.lightGreen,   'icon': '✅'},
-      'booking': {'color': AppColors.primaryGreen,  'bg': AppColors.lightGreen,   'icon': '🎫'},
-      'warning': {'color': AppColors.warning,       'bg': AppColors.warningBg,    'icon': '⚠️'},
-      'info':    {'color': const Color(0xFF1565C0), 'bg': const Color(0xFFE3F2FD),'icon': 'ℹ️'},
-      'danger':  {'color': AppColors.danger,        'bg': AppColors.dangerLight,  'icon': '❌'},
-    };
-    final cfg = tipeConfig[tipe] ?? tipeConfig['info']!;
-
-    return GestureDetector(
-      onTap: () => _markOneRead(n['id'] as int),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: isRead ? Colors.white : (cfg['bg'] as Color).withOpacity(.4),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isRead ? AppColors.borderColor : (cfg['color'] as Color).withOpacity(.25),
-            width: isRead ? 1 : 1.5,
-          ),
-          boxShadow: isRead ? [] : [BoxShadow(color: (cfg['color'] as Color).withOpacity(.08), blurRadius: 8, offset: const Offset(0, 2))],
-        ),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Left color bar
-          Container(
-            width: 4,
-            height: double.infinity,
-            constraints: const BoxConstraints(minHeight: 80),
-            decoration: BoxDecoration(
-              color: isRead ? Colors.transparent : cfg['color'] as Color,
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(14), bottomLeft: Radius.circular(14)),
-            ),
-          ),
-          // Icon
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 14, 0, 14),
-            child: Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(color: cfg['bg'] as Color, borderRadius: BorderRadius.circular(12)),
-              child: Center(child: Text(cfg['icon'] as String, style: const TextStyle(fontSize: 18))),
-            ),
-          ),
-          // Content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Expanded(
-                    child: Text(n['judul'] as String,
-                      style: TextStyle(fontSize: 13, fontWeight: isRead ? FontWeight.w600 : FontWeight.w800, color: AppColors.textPrimary)),
-                  ),
-                  if (!isRead) Container(
-                    width: 8, height: 8,
-                    decoration: const BoxDecoration(color: AppColors.primaryOrange, shape: BoxShape.circle),
-                  ),
-                ]),
-                const SizedBox(height: 5),
-                Text(n['pesan'] as String,
-                  style: TextStyle(fontSize: 12.5, color: isRead ? AppColors.textMuted : AppColors.textSecondary, height: 1.5),
-                  maxLines: 3, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 8),
-                Row(children: [
-                  Icon(Icons.access_time_rounded, size: 12, color: AppColors.textMuted),
-                  const SizedBox(width: 4),
-                  Text(n['created_at'] as String, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                  const Spacer(),
-                  if (!isRead) Text('Ketuk untuk baca', style: TextStyle(fontSize: 10.5, color: (cfg['color'] as Color).withOpacity(.7), fontWeight: FontWeight.w600)),
-                ]),
-              ]),
-            ),
-          ),
-        ]),
-      ),
-    );
+  IconData _getIconData(String tipe) {
+    switch (tipe) {
+      case 'sukses':
+        return Icons.check_circle_rounded;
+      case 'batal':
+        return Icons.cancel_rounded;
+      case 'paket':
+        return Icons.backpack_rounded;
+      case 'promo':
+      default:
+        return Icons.local_offer_rounded;
+    }
   }
 }

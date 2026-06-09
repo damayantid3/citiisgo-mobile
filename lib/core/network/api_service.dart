@@ -102,11 +102,14 @@ class ApiService {
   // ── User: Ulasan ───────────────────────────────────────────
   Future<Response> createUlasan(Map<String, dynamic> data,
       {List<MultipartFile>? foto}) async {
-    final formData = FormData.fromMap({
-      ...data,
-      if (foto != null)
-        'foto[]': foto,
-    });
+    final Map<String, dynamic> mapData = {...data};
+    
+    // Pastikan foto tidak null DAN tidak kosong sebelum dimasukkan ke FormData
+    if (foto != null && foto.isNotEmpty) {
+      mapData['foto[]'] = foto;
+    }
+
+    final formData = FormData.fromMap(mapData);
     return _dio.post('/user/ulasan', data: formData);
   }
 

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/config/app_colors.dart';
 
 class KategoriChip extends StatelessWidget {
   final String label;
@@ -15,17 +14,23 @@ class KategoriChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.primaryGreen : Colors.white,
-          border: Border.all(color: isActive ? AppColors.primaryGreen : AppColors.borderColor, width: 1.5),
-          borderRadius: BorderRadius.circular(20),
+          color: isActive ? const Color(0xFF0F7133) : Colors.white,
+          borderRadius: BorderRadius.circular(14), // Sudut tumpul estetik
+          boxShadow: [
+            if (!isActive) BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+          ],
+          border: Border.all(color: isActive ? const Color(0xFF0F7133) : const Color(0xFFE2E8F0), width: 1.5),
         ),
-        child: Text(
-          label,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 11.5, fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-            color: isActive ? Colors.white : AppColors.textSecondary,
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13, 
+              fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+              color: isActive ? Colors.white : const Color(0xFF64748B),
+            ),
           ),
         ),
       ),

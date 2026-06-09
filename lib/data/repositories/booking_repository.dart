@@ -1,82 +1,160 @@
-// ─── lib/data/repositories/booking_repository.dart ────────────
-import '../../core/network/api_service.dart';
-import '../models/booking_camping_model.dart';
-import '../models/reservasi_model.dart';
+import 'dart:async';
 
 class BookingRepository {
-  final ApiService _api = ApiService();
- 
-  // ── Reservasi ──
-  Future<List<ReservasiModel>> getMyReservasi() async {
+  // Singleton Pattern: Memastikan satu repositori terbagi rata di semua screen
+  static final BookingRepository _instance = BookingRepository._internal();
+  factory BookingRepository() => _instance;
+  BookingRepository._internal();
+
+  // Database memori lokal untuk simulasi daftar riwayat realtime
+  final List<Map<String, dynamic>> _riwayatList = [];
+
+  List<Map<String, dynamic>> get getRiwayat => _riwayatList;
+
+  // 1. Booking Tiket Masuk
+  Future<Map<String, dynamic>> createBookingTiket(Map<String, dynamic> data) async {
     try {
-      final res = await _api.getMyReservasi();
-      final list = res.data['data']['data'] as List? ?? [];
-      return list.map((r) => ReservasiModel.fromJson(r)).toList();
-    } catch (_) { return []; }
-  }
- 
-  Future<Map<String, dynamic>> createReservasi(Map<String, dynamic> data) async {
-    try {
-      final res = await _api.createReservasi(data);
-      final body = res.data;
-      if (body['success'] == true) {
-        return {
-          'success': true,
-          'data': ReservasiModel.fromJson(body['data']),
-          'payment_url': body['payment_url'],
-        };
-      }
-      return {'success': false, 'message': body['message'] ?? 'Gagal membuat reservasi.'};
+      await Future.delayed(const Duration(milliseconds: 500));
+      final id = 'TKT-${DateTime.now().millisecondsSinceEpoch}';
+
+      // Mengonversi data total_harga ke int dengan aman untuk mencegah TypeError di Flutter Web
+      final int hargaTotal = int.tryParse(data['total_harga'].toString()) ?? 25000;
+
+      final Map<String, dynamic> newBooking = {
+        'id': id,
+        'tipe': 'Tiket Masuk',
+        'layanan': 'Tiket Masuk Wisata Citiis',
+        'tanggal': data['tanggal_kunjungan'] ?? '-',
+        'detail': '${data['jumlah_tiket'] ?? 1} Orang',
+        'total_harga': hargaTotal,
+        'status': 'Belum Dibayar',
+      };
+      
+      _riwayatList.insert(0, newBooking);
+
+      // Mengembalikan Map dengan kepastian tipe data agar Flutter Web tidak membaca undefined
+      return {
+        'success': true,
+        'booking_id': id,
+        'payment_url': 'https://app.sandbox.midtrans.com/snap/v2/vtweb/$id',
+      };
     } catch (e) {
-      return {'success': false, 'message': 'Koneksi gagal.'};
+      return {
+        'success': false,
+        'message': 'Gagal membuat reservasi tiket lokal: $e',
+      };
     }
   }
- 
-  Future<Map<String, dynamic>> cancelReservasi(int id) async {
-    try {
-      final res = await _api.cancelReservasi(id);
-      return {'success': res.data['success'] == true};
-    } catch (_) {
-      return {'success': false};
-    }
-  }
-  // ── Booking Camping ──
-  Future<List<BookingCampingModel>> getMyBookingCamping() async {
-    try {
-      final res = await _api.getMyBookingCamping();
-      final list = res.data['data']['data'] as List? ?? [];
-      return list.map((b) => BookingCampingModel.fromJson(b)).toList();
-    } catch (_) { return []; }
-  }
- 
+
+  // 2. Booking Camping
   Future<Map<String, dynamic>> createBookingCamping(Map<String, dynamic> data) async {
     try {
-      final res = await _api.createBookingCamping(data);
-      final body = res.data;
-      if (body['success'] == true) {
-        return {
-          'success': true,
-          'data': BookingCampingModel.fromJson(body['data']),
-          'payment_url': body['payment_url'],
-        };
-      }
-      return {'success': false, 'message': body['message'] ?? 'Gagal booking camping.'};
+      await Future.delayed(const Duration(milliseconds: 500));
+      final id = 'BCP-${DateTime.now().millisecondsSinceEpoch}';
+      
+      final int hargaTotal = int.tryParse(data['total_harga'].toString()) ?? 75000;
+
+      final Map<String, dynamic> newBooking = {
+        'id': id,
+        'tipe': 'Sewa Camp',
+        'layanan': data['nama_paket'] ?? 'Paket Camping',
+        'tanggal': '${data['tanggal_checkin'] ?? "-"} s/d ${data['tanggal_checkout'] ?? "-"}',
+        'detail': '${data['jumlah_tamu'] ?? 1} Peserta',
+        'total_harga': hargaTotal,
+        'status': 'Belum Dibayar',
+      };
+
+      _riwayatList.insert(0, newBooking);
+
+      return {
+        'success': true,
+        'booking_id': id,
+        'payment_url': 'https://app.sandbox.midtrans.com/snap/v2/vtweb/$id',
+      };
     } catch (e) {
-      return {'success': false, 'message': 'Koneksi gagal.'};
+      return {
+        'success': false,
+        'message': 'Gagal membuat reservasi camping: $e',
+      };
     }
   }
- 
-  // ── Sewa Peralatan ──
-  Future<Map<String, dynamic>> createSewaPeralatan(Map<String, dynamic> data) async {
+
+  // 3. Booking Penginapan Hotel
+  Future<Map<String, dynamic>> createBookingPenginapan(Map<String, dynamic> data) async {
     try {
-      final res = await _api.createSewaPeralatan(data);
-      final body = res.data;
-      if (body['success'] == true) {
-        return {'success': true, 'payment_url': body['payment_url']};
-      }
-      return {'success': false, 'message': body['message'] ?? 'Gagal menyewa peralatan.'};
+      await Future.delayed(const Duration(milliseconds: 500));
+      final id = 'BGP-${DateTime.now().millisecondsSinceEpoch}';
+      
+      final int hargaTotal = int.tryParse(data['total_harga'].toString()) ?? 350000;
+      
+      final Map<String, dynamic> newBooking = {
+        'id': id,
+        'tipe': 'Penginapan',
+        'layanan': data['tipe_kamar'] ?? 'Kamar Resort Wisata',
+        'tanggal': '${data['tanggal_checkin'] ?? "-"} s/d ${data['tanggal_checkout'] ?? "-"}',
+        'detail': 'Akomodasi Kamar',
+        'total_harga': hargaTotal,
+        'status': 'Belum Dibayar',
+      };
+
+      _riwayatList.insert(0, newBooking);
+
+      return {
+        'success': true,
+        'booking_id': id,
+        'payment_url': 'https://app.sandbox.midtrans.com/snap/v2/vtweb/$id',
+      };
     } catch (e) {
-      return {'success': false, 'message': 'Koneksi gagal.'};
+      return {
+        'success': false,
+        'message': 'Gagal membuat reservasi penginapan: $e',
+      };
     }
+  }
+
+  // 4. Booking Sewa Alat Camp
+  Future<Map<String, dynamic>> createBookingAlat(Map<String, dynamic> data) async {
+    try {
+      await Future.delayed(const Duration(milliseconds: 500));
+      final id = 'ALT-${DateTime.now().millisecondsSinceEpoch}';
+
+      final int hargaTotal = int.tryParse(data['total_harga'].toString()) ?? 0;
+
+      final Map<String, dynamic> newBooking = {
+        'id': id,
+        'tipe': 'Sewa Alat',
+        'layanan': data['ringkasan_alat'] ?? 'Sewa Peralatan Camping',
+        'tanggal': 'Durasi: ${data['durasi'] ?? 1} Hari',
+        'detail': '${data['total_item'] ?? 0} Barang',
+        'total_harga': hargaTotal,
+        'status': 'Belum Dibayar',
+      };
+
+      _riwayatList.insert(0, newBooking);
+
+      return {
+        'success': true,
+        'booking_id': id,
+        'payment_url': 'https://app.sandbox.midtrans.com/snap/v2/vtweb/$id',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Gagal membuat sewa alat: $e',
+      };
+    }
+  }
+
+  // Aksi Update Status saat Pembayaran Sukses di-klik
+  void updateStatusBayar(String id) {
+    final idx = _riwayatList.indexWhere((element) => element['id'] == id);
+    if (idx != -1) {
+      _riwayatList[idx]['status'] = 'Lunas';
+    }
+  }
+
+  // Fungsi tambahan cadangan jika diperlukan oleh sistem lama
+  Future<Map<String, dynamic>> createReservasi(Map<String, dynamic> data) async {
+    return await createBookingTiket(data);
   }
 }

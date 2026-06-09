@@ -1,27 +1,34 @@
-// ─── lib/data/repositories/auth_repository.dart ───────────────
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:dio/dio.dart';
 import 'dart:convert';
+import '../../core/network/dio_client.dart';
 import '../../core/network/api_service.dart';
 import '../models/user_model.dart';
  
 class AuthRepository {
-  final ApiService _api = ApiService();
-  static const _storage = FlutterSecureStorage();
+  // PENTING: Pastikan ApiService kamu menerima DioClient.instance di constructor-nya nanti!
+  final ApiService _api = ApiService(); 
  
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
       final res = await _api.login(email, password);
       final data = res.data;
+      
       if (data['success'] == true) {
         final token = data['data']['token'] as String;
         final user = UserModel.fromJson(data['data']['user']);
-        await _storage.write(key: 'api_token', value: token);
-        await _storage.write(key: 'user', value: jsonEncode(user.toJson()));
+        
+        await DioClient.storage.write(key: 'api_token', value: token);
+        await DioClient.storage.write(key: 'user', value: jsonEncode(user.toJson()));
+        
         return {'success': true, 'user': user};
       }
       return {'success': false, 'message': data['message'] ?? 'Login gagal'};
+    } on DioException catch (e) {
+      // Mengambil pesan error asli dari response body backend
+      final errorMessage = e.response?.data?['message'] ?? 'Gagal terhubung ke server.';
+      return {'success': false, 'message': errorMessage};
     } catch (e) {
-      return {'success': false, 'message': 'Koneksi gagal. Periksa jaringan Anda.'};
+      return {'success': false, 'message': 'Terjadi kesalahan sistem.'};
     }
   }
  
@@ -32,31 +39,36 @@ class AuthRepository {
       if (body['success'] == true) {
         final token = body['data']['token'] as String;
         final user = UserModel.fromJson(body['data']['user']);
-        await _storage.write(key: 'api_token', value: token);
-        await _storage.write(key: 'user', value: jsonEncode(user.toJson()));
+        
+        await DioClient.storage.write(key: 'api_token', value: token);
+        await DioClient.storage.write(key: 'user', value: jsonEncode(user.toJson()));
+        
         return {'success': true, 'user': user};
       }
       return {'success': false, 'message': body['message'] ?? 'Registrasi gagal'};
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data?['message'] ?? 'Gagal mendaftarkan akun.';
+      return {'success': false, 'message': errorMessage};
     } catch (e) {
-      return {'success': false, 'message': 'Koneksi gagal.'};
+      return {'success': false, 'message': 'Terjadi kesalahan saat registrasi.'};
     }
   }
  
   Future<void> logout() async {
     try { await _api.logout(); } catch (_) {}
-    await _storage.deleteAll();
+    await DioClient.storage.deleteAll();
   }
  
   Future<UserModel?> getLocalUser() async {
     try {
-      final userStr = await _storage.read(key: 'user');
+      final userStr = await DioClient.storage.read(key: 'user');
       if (userStr != null) return UserModel.fromJson(jsonDecode(userStr));
     } catch (_) {}
     return null;
   }
  
   Future<bool> isLoggedIn() async {
-    final token = await _storage.read(key: 'api_token');
+    final token = await DioClient.storage.read(key: 'api_token');
     return token != null && token.isNotEmpty;
   }
  
@@ -66,13 +78,13 @@ class AuthRepository {
       final body = res.data;
       if (body['success'] == true) {
         final user = UserModel.fromJson(body['data']);
-        await _storage.write(key: 'user', value: jsonEncode(user.toJson()));
+        await DioClient.storage.write(key: 'user', value: jsonEncode(user.toJson()));
         return {'success': true, 'user': user};
       }
       return {'success': false, 'message': body['message']};
-    } catch (e) {
-      return {'success': false, 'message': 'Gagal memperbarui profil.'};
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data?['message'] ?? 'Gagal memperbarui profil.';
+      return {'success': false, 'message': errorMessage};
     }
   }
 }
- 

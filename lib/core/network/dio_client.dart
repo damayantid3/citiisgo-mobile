@@ -1,10 +1,11 @@
 import 'package:dio/dio.dart';
-// ignore: depend_on_referenced_packages
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../config/api_config.dart';
 
 class DioClient {
   static Dio? _dio;
+  // Gunakan satu storage global agar konsisten
+  static const storage = FlutterSecureStorage();
 
   static Dio get instance {
     _dio ??= _createDio();
@@ -33,16 +34,13 @@ class DioClient {
   static void reset() => _dio = null;
 }
 
-// ── Auth Interceptor ──────────────────────────────────────────
 class _AuthInterceptor extends Interceptor {
   final Dio dio;
   _AuthInterceptor(this.dio);
 
-  static const _storage = FlutterSecureStorage();
-
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
-    final token = await _storage.read(key: 'api_token');
+    final token = await DioClient.storage.read(key: 'api_token');
     if (token != null) {
       options.headers['Authorization'] = 'Bearer $token';
     }
@@ -52,21 +50,20 @@ class _AuthInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
-      // Token expired → hapus dan arahkan ke login
-      await _storage.delete(key: 'api_token');
-      // TODO: navigate to login (gunakan GoRouter redirect)
+      await DioClient.storage.delete(key: 'api_token');
+      await DioClient.storage.delete(key: 'user');
+      // TODO: Pemicu event logout global di AuthProvider/GoRouter di sini
     }
     handler.next(err);
   }
 }
 
-// ── Log Interceptor ───────────────────────────────────────────
 class _LogInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     assert(() {
-      // ignore: avoid_print
-      print('[API] ${options.method} ${options.path}');
+      print('[API REQ] ${options.method} ──> ${options.baseUrl}${options.path}');
+      if (options.data != null) print('[API BODY] ${options.data}');
       return true;
     }());
     handler.next(options);
@@ -75,8 +72,8 @@ class _LogInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     assert(() {
-      // ignore: avoid_print
-      print('[API ERROR] ${err.response?.statusCode} ${err.message}');
+      print('[API ERR] ${err.response?.statusCode} ──> ${err.requestOptions.path}');
+      print('[API ERR MSG] ${err.response?.data ?? err.message}');
       return true;
     }());
     handler.next(err);

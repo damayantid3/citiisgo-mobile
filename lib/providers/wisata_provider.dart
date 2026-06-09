@@ -8,13 +8,14 @@ class WisataProvider extends ChangeNotifier {
 
   List<WisataModel> get allWisata => _allWisata;
   List<WisataModel> get popularWisata => _allWisata.where((w) => w.tag == 'Populer' || w.tag == 'Trending').toList();
-  List<WisataModel> get nearbyWisata => _allWisata.where((w) => w.jarakKm != null).toList();
+  List<WisataModel> get nearbyWisata => _allWisata.where((w) => w.jarakKm != null && w.jarakKm! > 0).toList();
   String get kategoriAktif => _kategoriAktif;
   bool get isLoading => _isLoading;
 
   List<WisataModel> get filteredWisata {
     if (_kategoriAktif == 'Semua') return _allWisata;
-    return _allWisata.where((w) => w.kategori == _kategoriAktif).toList();
+    // Perbaikan Logika Filter: Membandingkan string nama dari objek kategori model
+    return _allWisata.where((w) => w.kategori?.nama == _kategoriAktif).toList();
   }
 
   Future<void> loadWisata() async {
@@ -22,7 +23,7 @@ class WisataProvider extends ChangeNotifier {
     notifyListeners();
 
     await Future.delayed(const Duration(milliseconds: 800));
-    _allWisata = [];
+    _allWisata = []; // Di sini nantinya repositori nyata kamu memuat data dari citiisgo-api
     _isLoading = false;
     notifyListeners();
   }
