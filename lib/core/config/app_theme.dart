@@ -76,36 +76,4 @@ class AppTheme {
       unselectedLabelStyle: const TextStyle(fontSize: 11),
     ),
   );
-}
-
-// ─── lib/core/config/api_config.dart ──────────────────────────
-class ApiConfig {
-  ApiConfig._();
-
-  // ── Ganti sesuai environment ──
-  static const String baseUrl = String.fromEnvironment(
-    'API_URL',
-    defaultValue: 'http://10.0.2.2:8001/api/v1', // Android emulator → localhost:8001
-    // defaultValue: 'http://localhost:8001/api/v1', // iOS simulator
-    // defaultValue: 'https://api.citiisgo.id/api/v1', // Production
-  );
-
-  static const Duration connectTimeout = Duration(seconds: 15);
-  static const Duration receiveTimeout = Duration(seconds: 15);
-
-  // Endpoints
-  static const String login        = '/auth/login';
-  static const String register     = '/auth/register';
-  static const String logout       = '/auth/logout';
-  static const String me           = '/auth/me';
-  static const String updateProfile= '/auth/profile';
-
-  static const String wisata        = '/wisata';
-  static const String kategori      = '/kategori-wisata';
-  static const String reservasi     = '/user/reservasi';
-  static const String bookingCamping= '/user/booking-camping';
-  static const String bookingPenginapan='/user/booking-penginapan';
-  static const String sewaPeralatan = '/user/sewa-peralatan';
-  static const String ulasan        = '/user/ulasan';
-  static const String notifikasi    = '/user/notifikasi';
-}
+}

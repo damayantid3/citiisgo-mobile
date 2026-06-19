@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../core/config/app_colors.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../data/models/wisata_model.dart';
 import '../../../data/repositories/wisata_repository.dart';
+import '../../widgets/shimmer_loading.dart';
+import '../../widgets/error_state_widget.dart';
 import '../reservasi/reservasi_screen.dart';
 import '../camping/booking_camping_screen.dart';
 import '../penginapan/booking_penginapan_screen.dart';
@@ -58,8 +60,24 @@ class _WisataDetailScreenState extends State<WisataDetailScreen>
   }
 
   Widget _errorState() => Scaffold(
-    appBar: AppBar(backgroundColor: colorPrimary, elevation: 0),
-    body: Center(child: Text('Wisata tidak ditemukan', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: colorSlate900))),
+    appBar: AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: colorSlate900, size: 18),
+        onPressed: () => Navigator.pop(context),
+      ),
+    ),
+    body: ErrorStateWidget(
+      title: 'Destinasi Tidak Ditemukan',
+      message: 'Gagal mengambil detail destinasi wisata. Silakan periksa koneksi internet Anda.',
+      onRetry: () {
+        setState(() {
+          _loading = true;
+        });
+        _loadDetail();
+      },
+    ),
   );
 
   Widget _buildContent() {
@@ -102,7 +120,14 @@ class _WisataDetailScreenState extends State<WisataDetailScreen>
                       decoration: const BoxDecoration(
                         gradient: LinearGradient(colors: [Color(0xFF064E3B), colorPrimary], begin: Alignment.topCenter, end: Alignment.bottomCenter)
                       ),
-                      child: const Center(child: Icon(Icons.landscape_rounded, size: 80, color: Colors.white24)),
+                      child: (w.cover != null && w.cover!.isNotEmpty)
+                          ? CachedNetworkImage(
+                              imageUrl: w.cover!,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => const ShimmerPlaceholder(width: double.infinity, height: 300, borderRadius: 0),
+                              errorWidget: (context, url, error) => const Center(child: Icon(Icons.landscape_rounded, size: 80, color: Colors.white24)),
+                            )
+                          : const Center(child: Icon(Icons.landscape_rounded, size: 80, color: Colors.white24)),
                     ),
                     Container(
                       decoration: BoxDecoration(
@@ -311,14 +336,37 @@ class _WisataDetailScreenState extends State<WisataDetailScreen>
   }
 
   Widget _galeriTab(WisataModel w) {
+    final list = w.galeri;
+    if (list.isEmpty) {
+      return GridView.builder(
+        padding: const EdgeInsets.all(20),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 10, crossAxisSpacing: 10),
+        itemCount: 6,
+        itemBuilder: (_, i) => Container(
+          decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(14)),
+          child: const Center(child: Icon(Icons.image_rounded, color: colorSlate500, size: 24)),
+        ),
+      );
+    }
     return GridView.builder(
       padding: const EdgeInsets.all(20),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 10, crossAxisSpacing: 10),
-      itemCount: 6,
-      itemBuilder: (_, i) => Container(
-        decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(14)),
-        child: const Center(child: Icon(Icons.image_rounded, color: colorSlate500, size: 24)),
-      ),
+      itemCount: list.length,
+      itemBuilder: (_, i) {
+        final img = list[i];
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: CachedNetworkImage(
+            imageUrl: img.url,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => const ShimmerPlaceholder(width: double.infinity, height: double.infinity, borderRadius: 14),
+            errorWidget: (context, url, error) => Container(
+              color: const Color(0xFFE2E8F0),
+              child: const Icon(Icons.broken_image_rounded, color: colorSlate500, size: 24),
+            ),
+          ),
+        );
+      },
     );
   }
 

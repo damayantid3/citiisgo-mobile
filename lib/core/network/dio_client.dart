@@ -1,6 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../config/api_config.dart';
+import '../config/app_navigator.dart';
+import '../../providers/auth_provider.dart';
+import '../../presentation/screens/auth/login_screen.dart';
 
 class DioClient {
   static Dio? _dio;
@@ -52,7 +57,17 @@ class _AuthInterceptor extends Interceptor {
     if (err.response?.statusCode == 401) {
       await DioClient.storage.delete(key: 'api_token');
       await DioClient.storage.delete(key: 'user');
-      // TODO: Pemicu event logout global di AuthProvider/GoRouter di sini
+      
+      final context = AppNavigator.context;
+      if (context != null) {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        authProvider.handleSessionExpired();
+        
+        AppNavigator.state?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
     }
     handler.next(err);
   }

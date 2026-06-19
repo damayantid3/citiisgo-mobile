@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/config/app_colors.dart';
+import '../../../core/network/api_service.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/peralatan_model.dart';
-import '../../../data/repositories/booking_repository.dart';
 import '../../../data/repositories/wisata_repository.dart';
 import '../pembayaran/pembayaran_screen.dart';
 
@@ -16,11 +17,11 @@ class SewaPeralatanScreen extends StatefulWidget {
 }
 
 class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
-  final _wisataRepo  = WisataRepository();
-  final _bookingRepo = BookingRepository();
+  final _wisataRepo = WisataRepository();
+  final _apiService = ApiService();
   List<PeralatanModel> _peralatan = [];
   final Map<int, int> _cart = {}; // peralatan_id -> jumlah
-  DateTime _mulai   = DateTime.now().add(const Duration(days: 1));
+  DateTime _mulai = DateTime.now().add(const Duration(days: 1));
   DateTime _selesai = DateTime.now().add(const Duration(days: 2));
   bool _loading = false, _loadingData = true;
 
@@ -31,31 +32,46 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
   }
 
   Future<void> _loadData() async {
+    debugPrint('[DEBUG SewaAlat] Loading data for Wisata ID: ${widget.wisataId}, mulai: ${_fmtDate(_mulai)}, selesai: ${_fmtDate(_selesai)}');
     try {
-      final data = await _wisataRepo.getPeralatan(widget.wisataId);
+      final data = await _wisataRepo.getPeralatan(
+        widget.wisataId,
+        mulai: _fmtDate(_mulai),
+        selesai: _fmtDate(_selesai),
+      );
+      debugPrint('[DEBUG SewaAlat] Loaded ${data.length} items');
+      for (var item in data) {
+        debugPrint('[DEBUG SewaAlat] Item: ${item.nama}, stokTersedia: ${item.stokTersedia}');
+      }
       if (mounted) {
         setState(() {
-          if (data != null && data.isNotEmpty) {
-            _peralatan = data;
-          } else {
-            // FAIL-SAFE DATA DUMMY: Jika database kosong, fitur sewa tetap berfungsi nyata dengan aman
-            _peralatan = [
-              const PeralatanModel(id: 1, nama: 'Tenda Dome Waterproof 4P', hargaSewaPerHari: 45000, totalStok: 10, stokTersedia: 10),
-              const PeralatanModel(id: 2, nama: 'Sleeping Bag Thermal Wool', hargaSewaPerHari: 15000, totalStok: 15, stokTersedia: 15),
-              const PeralatanModel(id: 3, nama: 'Matras Camping Spons', hargaSewaPerHari: 7000, totalStok: 20, stokTersedia: 20),
-              const PeralatanModel(id: 4, nama: 'Kompor Portable & Gas Mini', hargaSewaPerHari: 25000, totalStok: 8, stokTersedia: 8),
-            ];
-          }
+          _peralatan = data;
           _loadingData = false;
+          
+          // Clamp cart quantities to the new available stock
+          _cart.removeWhere((id, qty) {
+            final itemsFound = _peralatan.where((x) => x.id == id);
+            if (itemsFound.isEmpty) {
+              return true; // Remove item if it's no longer available
+            }
+            final available = itemsFound.first.stokTersedia;
+            if (qty > available) {
+              if (available > 0) {
+                _cart[id] = available; // Clamp to max available
+              } else {
+                return true; // Remove if no stock available
+              }
+            }
+            return false;
+          });
         });
       }
-    } catch (_) {
+    } catch (e, stack) {
+      debugPrint('[DEBUG SewaAlat] Error loading data: $e');
+      debugPrint('[DEBUG SewaAlat] Stacktrace: $stack');
       if (mounted) {
         setState(() {
-          _peralatan = [
-            const PeralatanModel(id: 1, nama: 'Tenda Dome Waterproof 4P', hargaSewaPerHari: 45000, totalStok: 10, stokTersedia: 10),
-            const PeralatanModel(id: 2, nama: 'Sleeping Bag Thermal Wool', hargaSewaPerHari: 15000, totalStok: 15, stokTersedia: 15),
-          ];
+          _peralatan = [];
           _loadingData = false;
         });
       }
@@ -76,13 +92,13 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
     return t;
   }
 
-  List<Map<String, dynamic>> get _cartItems => _cart.entries
-      .where((e) => e.value > 0)
-      .map((e) {
+  List<Map<String, dynamic>> get _cartItems =>
+      _cart.entries.where((e) => e.value > 0).map((e) {
         final itemsFound = _peralatan.where((x) => x.id == e.key);
         final namaBarang = itemsFound.isNotEmpty ? itemsFound.first.nama : '-';
         // PERBAIKAN: Menyelaraskan properti harga ke 'hargaSewaPerHari'
-        final hargaBarang = itemsFound.isNotEmpty ? itemsFound.first.hargaSewaPerHari : 0;
+        final hargaBarang =
+            itemsFound.isNotEmpty ? itemsFound.first.hargaSewaPerHari : 0;
         return {
           'peralatan_id': e.key,
           'jumlah': e.value,
@@ -99,7 +115,8 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
       lastDate: DateTime.now().add(const Duration(days: 90)),
       builder: (ctx, child) => Theme(
         data: ThemeData.light().copyWith(
-          colorScheme: const ColorScheme.light(primary: AppColors.purplePrimary),
+          colorScheme:
+              const ColorScheme.light(primary: AppColors.purplePrimary),
         ),
         child: child!,
       ),
@@ -108,58 +125,82 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
       setState(() {
         if (isMulai) {
           _mulai = d;
-          if (!_selesai.isAfter(_mulai)) _selesai = _mulai.add(const Duration(days: 1));
+          if (!_selesai.isAfter(_mulai))
+            _selesai = _mulai.add(const Duration(days: 1));
         } else {
           _selesai = d;
         }
+        _loadingData = true;
       });
+      await _loadData();
     }
-  }
-
-  int get _totalItemQty {
-    return _cartItems.fold(0, (sum, item) => sum + (item['jumlah'] as int));
-  }
-
-  String get _buatRingkasanTeks {
-    List<String> tersewa = [];
-    for (var item in _cartItems) {
-      tersewa.add('${item['nama']} (${item['jumlah']}x)');
-    }
-    return tersewa.isEmpty ? 'Sewa Alat Camp' : tersewa.join(', ');
   }
 
   Future<void> _sewa() async {
     if (_cartItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Pilih minimal 1 peralatan', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+        content: Text('Pilih minimal 1 peralatan',
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
         backgroundColor: AppColors.warning,
         behavior: SnackBarBehavior.floating,
       ));
       return;
     }
     setState(() => _loading = true);
-    
-    // PERBAIKAN: Menyelaraskan pemanggilan fungsi repo ke 'createBookingAlat' agar otomatis masuk tab Riwayat
-    final r = await _bookingRepo.createBookingAlat({
-      'durasi': _durasi,
-      'total_item': _totalItemQty,
-      'total_harga': _total,
-      'ringkasan_alat': _buatRingkasanTeks,
-    });
-    
-    if (!mounted) return;
-    setState(() => _loading = false);
-    
-    if (r['success'] == true) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => PembayaranScreen(
-        paymentUrl: r['payment_url'] ?? '',
-        kodeBooking: r['booking_id'] ?? 'ALT-000',
-        totalHarga: _total,
-        layanan: 'Sewa Alat Logistik Camp',
-      )));
-    } else {
+
+    try {
+      final res = await _apiService.createSewaPeralatan({
+        'wisata_id': widget.wisataId,
+        'tanggal_mulai': _fmtDate(_mulai),
+        'tanggal_selesai': _fmtDate(_selesai),
+        'items': _cartItems
+            .map((item) => {
+                  'peralatan_id': item['peralatan_id'],
+                  'jumlah': item['jumlah'],
+                })
+            .toList(),
+      });
+
+      final data = res.data;
+      if (!mounted) return;
+      setState(() => _loading = false);
+
+      if (data['success'] == true) {
+        final dynamic rawTotal = data['data']?['total_harga'];
+        final int totalBayar = rawTotal is int ? rawTotal : (double.tryParse(rawTotal?.toString() ?? '') ?? 0.0).round();
+        final String kodeSewa = data['data']?['kode_sewa'] ?? 'ALT-${data['data']?['id'] ?? ''}';
+        // Refresh data peralatan agar stok terbaru langsung tampil
+        await _loadData();
+        if (!mounted) return;
+        setState(() => _cart.clear());
+
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => PembayaranScreen(
+                      paymentUrl: data['payment_url'] ?? '',
+                      kodeBooking: kodeSewa,
+                      totalHarga: totalBayar == 0 ? _total : totalBayar,
+                      layanan: 'Sewa Alat Logistik Camp',
+                    )));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(data['message'] ?? 'Gagal memproses sewa barang',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      }
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      final msg =
+          e.response?.data['message'] ?? 'Terjadi kesalahan koneksi ke server';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(r['message'] ?? 'Gagal memproses sewa barang', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+        content: Text(msg,
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
         backgroundColor: AppColors.danger,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -176,7 +217,9 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
           _buildHeader(),
           Expanded(
             child: _loadingData
-                ? const Center(child: CircularProgressIndicator(color: AppColors.purplePrimary, strokeWidth: 3))
+                ? const Center(
+                    child: CircularProgressIndicator(
+                        color: AppColors.purplePrimary, strokeWidth: 3))
                 : SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.all(20),
@@ -185,7 +228,11 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
                       children: [
                         _buildDurationSection(),
                         const SizedBox(height: 24),
-                        Text('Katalog Perlengkapan', style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                        Text('Katalog Perlengkapan',
+                            style: GoogleFonts.plusJakartaSans(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary)),
                         const SizedBox(height: 12),
                         _buildKatalogList(),
                         if (_cartItems.isNotEmpty) ...[
@@ -208,18 +255,25 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [AppColors.purpleDark, AppColors.purplePrimary],
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
+          borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(24),
+              bottomRight: Radius.circular(24)),
         ),
         child: Row(
           children: [
             GestureDetector(
               onTap: () => Navigator.pop(context),
               child: Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(color: Colors.white.withOpacity(.15), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16),
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(.15),
+                    borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white, size: 16),
               ),
             ),
             const SizedBox(width: 14),
@@ -227,16 +281,32 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Sewa Peralatan', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
-                  Text('Sewa alat camping pelengkap liburanmu', style: GoogleFonts.plusJakartaSans(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500)),
+                  Text('Sewa Peralatan',
+                      style: GoogleFonts.plusJakartaSans(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3)),
+                  Text('Sewa alat camping pelengkap liburanmu',
+                      style: GoogleFonts.plusJakartaSans(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
             if (_cartItems.isNotEmpty)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: Colors.white.withOpacity(.2), borderRadius: BorderRadius.circular(10)),
-                child: Text('${_cartItems.length} Item', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(.2),
+                    borderRadius: BorderRadius.circular(10)),
+                child: Text('${_cartItems.length} Item',
+                    style: GoogleFonts.plusJakartaSans(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800)),
               ),
           ],
         ),
@@ -244,28 +314,50 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
 
   Widget _buildDurationSection() => Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.borderColor)),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.borderColor)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Durasi Peminjaman', style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            Text('Durasi Peminjaman',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary)),
             const SizedBox(height: 14),
             Row(
               children: [
-                Expanded(child: _dateTile('Mulai Sewa', _mulai, () => _pilihTanggal(true))),
-                Container(width: 1, height: 40, color: AppColors.borderColor, margin: const EdgeInsets.symmetric(horizontal: 14)),
-                Expanded(child: _dateTile('Selesai Sewa', _selesai, () => _pilihTanggal(false))),
+                Expanded(
+                    child: _dateTile(
+                        'Mulai Sewa', _mulai, () => _pilihTanggal(true))),
+                Container(
+                    width: 1,
+                    height: 40,
+                    color: AppColors.borderColor,
+                    margin: const EdgeInsets.symmetric(horizontal: 14)),
+                Expanded(
+                    child: _dateTile(
+                        'Selesai Sewa', _selesai, () => _pilihTanggal(false))),
               ],
             ),
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: AppColors.purpleLight, borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(
+                  color: AppColors.purpleLight,
+                  borderRadius: BorderRadius.circular(12)),
               child: Row(
                 children: [
-                  const Icon(Icons.av_timer_rounded, color: AppColors.purplePrimary, size: 18),
+                  const Icon(Icons.av_timer_rounded,
+                      color: AppColors.purplePrimary, size: 18),
                   const SizedBox(width: 8),
-                  Text('Total Waktu Pemakaian: $_durasi Hari', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, color: AppColors.purplePrimary, fontSize: 13)),
+                  Text('Total Waktu Pemakaian: $_durasi Hari',
+                      style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.purplePrimary,
+                          fontSize: 13)),
                 ],
               ),
             ),
@@ -284,28 +376,53 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isSelected ? AppColors.purplePrimary : AppColors.borderColor, width: isSelected ? 2 : 1),
-              boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withOpacity(isSelected ? 0.03 : 0.01), blurRadius: 12)],
+              border: Border.all(
+                  color: isSelected
+                      ? AppColors.purplePrimary
+                      : AppColors.borderColor,
+                  width: isSelected ? 2 : 1),
+              boxShadow: [
+                BoxShadow(
+                    color: const Color(0xFF0F172A)
+                        .withOpacity(isSelected ? 0.03 : 0.01),
+                    blurRadius: 12)
+              ],
             ),
             child: Row(
               children: [
                 Container(
-                  width: 52, height: 52,
-                  decoration: BoxDecoration(color: isSelected ? AppColors.purpleLight : AppColors.background, borderRadius: BorderRadius.circular(14)),
-                  child: Center(child: Text(_getEmoji(p.nama), style: const TextStyle(fontSize: 24))),
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.purpleLight
+                          : AppColors.background,
+                      borderRadius: BorderRadius.circular(14)),
+                  child: Center(
+                      child: Text(_getEmoji(p.nama),
+                          style: const TextStyle(fontSize: 24))),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(p.nama, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 13.5, color: AppColors.textPrimary)),
+                      Text(p.nama,
+                          style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13.5,
+                              color: AppColors.textPrimary)),
                       const SizedBox(height: 6),
                       Row(
                         children: [
                           _chip('Stok: ${p.stokTersedia}'),
                           const SizedBox(width: 8),
-                          Text('${CurrencyFormatter.format(p.hargaSewaPerHari)}/hari', style: GoogleFonts.plusJakartaSans(fontSize: 12, color: AppColors.purplePrimary, fontWeight: FontWeight.w800)),
+                          Text(
+                              '${CurrencyFormatter.format(p.hargaSewaPerHari)}/hari',
+                              style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  color: AppColors.purplePrimary,
+                                  fontWeight: FontWeight.w800)),
                         ],
                       ),
                     ],
@@ -321,19 +438,41 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
                           if (_cart[p.id] == 0) _cart.remove(p.id);
                         }),
                         child: Container(
-                          width: 30, height: 30,
-                          decoration: BoxDecoration(color: AppColors.purpleLight, borderRadius: BorderRadius.circular(8)),
-                          child: const Icon(Icons.remove_rounded, color: AppColors.purplePrimary, size: 14),
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                              color: AppColors.purpleLight,
+                              borderRadius: BorderRadius.circular(8)),
+                          child: const Icon(Icons.remove_rounded,
+                              color: AppColors.purplePrimary, size: 14),
                         ),
                       ),
-                      Container(width: 32, alignment: Alignment.center, child: Text('$qty', style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary))),
+                      Container(
+                          width: 32,
+                          alignment: Alignment.center,
+                          child: Text('$qty',
+                              style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary))),
                     ],
                     GestureDetector(
-                      onTap: qty < p.stokTersedia ? () => setState(() => _cart[p.id] = qty + 1) : null,
+                      onTap: qty < p.stokTersedia
+                          ? () => setState(() => _cart[p.id] = qty + 1)
+                          : null,
                       child: Container(
-                        width: 30, height: 30,
-                        decoration: BoxDecoration(color: qty < p.stokTersedia ? AppColors.purplePrimary : AppColors.background, borderRadius: BorderRadius.circular(8)),
-                        child: Icon(Icons.add_rounded, color: qty < p.stokTersedia ? Colors.white : AppColors.textMuted, size: 14),
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                            color: qty < p.stokTersedia
+                                ? AppColors.purplePrimary
+                                : AppColors.background,
+                            borderRadius: BorderRadius.circular(8)),
+                        child: Icon(Icons.add_rounded,
+                            color: qty < p.stokTersedia
+                                ? Colors.white
+                                : AppColors.textMuted,
+                            size: 14),
                       ),
                     ),
                   ],
@@ -346,28 +485,58 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
 
   Widget _buildInvoiceSummary() => Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.borderColor)),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.borderColor)),
         child: Column(
           children: [
-            Row(children: [Text('Ringkasan Invoice Peminjaman', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary))]),
+            Row(children: [
+              Text('Ringkasan Invoice Peminjaman',
+                  style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      color: AppColors.textPrimary))
+            ]),
             const Divider(color: AppColors.borderColor, height: 24),
-            ..._cartItems.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("${item['nama']} (${item['jumlah']}x)", style: GoogleFonts.plusJakartaSans(fontSize: 12.5, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
-                      Text(CurrencyFormatter.format((item['harga'] as int) * (item['jumlah'] as int) * _durasi), style: GoogleFonts.plusJakartaSans(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                    ],
-                  ),
-                )).toList(),
+            ..._cartItems
+                .map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("${item['nama']} (${item['jumlah']}x)",
+                              style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12.5,
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500)),
+                          Text(
+                              CurrencyFormatter.format((item['harga'] as int) *
+                                  (item['jumlah'] as int) *
+                                  _durasi),
+                              style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary)),
+                        ],
+                      ),
+                    ))
+                .toList(),
             _sumRow('Lama Durasi Pinjam', '$_durasi Hari'),
             const Divider(color: AppColors.borderColor, height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Total Pembayaran', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 13.5, color: AppColors.textPrimary)),
-                Text(CurrencyFormatter.format(_total), style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 15.5, color: AppColors.primaryGreen)),
+                Text('Total Pembayaran',
+                    style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13.5,
+                        color: AppColors.textPrimary)),
+                Text(CurrencyFormatter.format(_total),
+                    style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15.5,
+                        color: AppColors.primaryGreen)),
               ],
             ),
           ],
@@ -376,48 +545,89 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
 
   Widget _buildBottomAction() => Container(
         padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
-        decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(.03), blurRadius: 20, offset: const Offset(0, -4))]),
+        decoration: BoxDecoration(color: Colors.white, boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(.03),
+              blurRadius: 20,
+              offset: const Offset(0, -4))
+        ]),
         child: Row(
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Total Biaya Sewa', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-                Text(CurrencyFormatter.format(_total), style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.purplePrimary)),
+                Text('Total Biaya Sewa',
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w600)),
+                Text(CurrencyFormatter.format(_total),
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.purplePrimary)),
               ],
             ),
             const Spacer(),
             SizedBox(
-              width: 160, height: 46,
+              width: 160,
+              height: 46,
               child: ElevatedButton(
                 onPressed: (_loading || _cartItems.isEmpty) ? null : _sewa,
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.purplePrimary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.purplePrimary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    elevation: 0),
                 child: _loading
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                    : Text('Sewa Sekarang', style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.5, color: Colors.white))
+                    : Text('Sewa Sekarang',
+                        style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white)),
               ),
             ),
           ],
         ),
       );
 
-  Widget _dateTile(String lbl, DateTime d, VoidCallback onTap) => GestureDetector(
+  Widget _dateTile(String lbl, DateTime d, VoidCallback onTap) =>
+      GestureDetector(
         onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(lbl, style: GoogleFonts.plusJakartaSans(fontSize: 11, color: AppColors.purplePrimary, fontWeight: FontWeight.w700)),
+            Text(lbl,
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    color: AppColors.purplePrimary,
+                    fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
-            Text('${d.day} ${_bulan(d.month)} ${d.year}', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary)),
+            Text('${d.day} ${_bulan(d.month)} ${d.year}',
+                style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: AppColors.textPrimary)),
           ],
         ),
       );
 
   Widget _chip(String t) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
-        child: Text(t, style: GoogleFonts.plusJakartaSans(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(6)),
+        child: Text(t,
+            style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600)),
       );
 
   Widget _sumRow(String k, String v) => Padding(
@@ -425,8 +635,16 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(k, style: GoogleFonts.plusJakartaSans(fontSize: 12.5, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
-            Text(v, style: GoogleFonts.plusJakartaSans(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            Text(k,
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12.5,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500)),
+            Text(v,
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary)),
           ],
         ),
       );
@@ -442,6 +660,21 @@ class _SewaPeralatanScreenState extends State<SewaPeralatanScreen> {
     return '🔧';
   }
 
-  String _fmtDate(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-  String _bulan(int m) => ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'][m];
+  String _fmtDate(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  String _bulan(int m) => [
+        '',
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'Mei',
+        'Jun',
+        'Jul',
+        'Ags',
+        'Sep',
+        'Okt',
+        'Nov',
+        'Des'
+      ][m];
 }

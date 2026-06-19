@@ -21,13 +21,20 @@ class ReservasiModel {
   });
  
   factory ReservasiModel.fromJson(Map<String, dynamic> j) => ReservasiModel(
-    id: j['id'], kodeBooking: j['kode_booking'] ?? '',
+    id: j['id'] ?? 0, kodeBooking: j['kode_booking'] ?? '',
     tanggalKunjungan: j['tanggal_kunjungan'] ?? '',
-    jumlahTiket: j['jumlah_tiket'] ?? 0,
-    totalHarga: j['total_harga'] ?? 0,
+    jumlahTiket: _safeInt(j['jumlah_tiket']),
+    totalHarga: _safeInt(j['total_harga']),
     status: j['status'] ?? 'pending',
     wisata: j['wisata'] != null ? WisataModel.fromJson(j['wisata']) : null,
     pembayaran: j['pembayaran'] != null ? PembayaranInfo.fromJson(j['pembayaran']) : null,
     createdAt: j['created_at'],
   );
+}
+
+int _safeInt(dynamic val) {
+  if (val == null) return 0;
+  if (val is int) return val;
+  if (val is double) return val.round();
+  return (double.tryParse(val.toString()) ?? 0.0).round();
 }

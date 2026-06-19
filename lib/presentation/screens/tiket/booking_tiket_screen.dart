@@ -5,6 +5,8 @@ import '../../../core/config/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/repositories/booking_repository.dart';
 import '../../../providers/notifikasi_provider.dart'; // Import provider notifikasi baru
+import '../../../data/models/wisata_model.dart';
+import '../../../providers/wisata_provider.dart';
 import '../pembayaran/pembayaran_screen.dart';
 
 class BookingTiketScreen extends StatefulWidget {
@@ -18,11 +20,31 @@ class BookingTiketScreen extends StatefulWidget {
 class _BookingTiketScreenState extends State<BookingTiketScreen> {
   final _bookingRepo = BookingRepository();
   int _jumlahTiket = 1;
-  final int _hargaTiket = 25000; 
+  int _hargaTiket = 20000; 
+  String _wisataNama = 'Kawasan Wisata Gunung Citiis';
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   bool _loading = false;
 
   int get _totalHarga => _jumlahTiket * _hargaTiket;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final wisataP = Provider.of<WisataProvider>(context, listen: false);
+      final allList = wisataP.allWisata.where((w) => w.id == widget.wisataId);
+      final filteredList = wisataP.filteredWisata.where((w) => w.id == widget.wisataId);
+      final WisataModel? wisata = allList.isNotEmpty
+          ? allList.first
+          : (filteredList.isNotEmpty ? filteredList.first : null);
+      if (wisata != null) {
+        setState(() {
+          _wisataNama = wisata.nama;
+          _hargaTiket = wisata.hargaTiket;
+        });
+      }
+    });
+  }
 
   Future<void> _pilihTanggal() async {
     final DateTime? picked = await showDatePicker(
@@ -49,6 +71,7 @@ class _BookingTiketScreenState extends State<BookingTiketScreen> {
 
     try {
       final r = await _bookingRepo.createBookingTiket({
+        'wisata_id': widget.wisataId,
         'tanggal_kunjungan': _fmtDate(_selectedDate),
         'jumlah_tiket': _jumlahTiket,
         'total_harga': _totalHarga, 
@@ -174,7 +197,7 @@ class _BookingTiketScreenState extends State<BookingTiketScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Kawasan Wisata Gunung Citiis', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary)),
+                  Text(_wisataNama, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary)),
                   const SizedBox(height: 4),
                   Text('Tiket berlaku untuk 1 orang / 1 kali masuk', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
                 ],

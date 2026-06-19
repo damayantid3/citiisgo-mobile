@@ -68,9 +68,9 @@ class WisataRepository {
     }
   }
  
-  Future<List<PeralatanModel>> getPeralatan(int wisataId) async {
+  Future<List<PeralatanModel>> getPeralatan(int wisataId, {String? mulai, String? selesai}) async {
     try {
-      final res = await _api.getPeralatanPublic(wisataId);
+      final res = await _api.getPeralatanPublic(wisataId, mulai: mulai, selesai: selesai);
       final list = res.data['data'] as List;
       return list.map((p) => PeralatanModel.fromJson(p)).toList();
     } catch (_) {

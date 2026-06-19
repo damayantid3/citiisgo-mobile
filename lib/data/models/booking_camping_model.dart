@@ -23,14 +23,21 @@ class BookingCampingModel {
   });
  
   factory BookingCampingModel.fromJson(Map<String, dynamic> j) => BookingCampingModel(
-    id: j['id'], kodeBooking: j['kode_booking'] ?? '',
+    id: j['id'] ?? 0, kodeBooking: j['kode_booking'] ?? '',
     tanggalCheckin: j['tanggal_checkin'] ?? '',
     tanggalCheckout: j['tanggal_checkout'] ?? '',
-    jumlahTamu: j['jumlah_tamu'] ?? 0,
-    durasi: j['durasi'] ?? 0,
-    totalHarga: j['total_harga'] ?? 0,
+    jumlahTamu: _safeInt(j['jumlah_tamu']),
+    durasi: _safeInt(j['durasi']),
+    totalHarga: _safeInt(j['total_harga']),
     status: j['status'] ?? 'pending',
     paket: j['paket'] != null ? PaketCampingModel.fromJson(j['paket']) : null,
     pembayaran: j['pembayaran'] != null ? PembayaranInfo.fromJson(j['pembayaran']) : null,
   );
+}
+
+int _safeInt(dynamic val) {
+  if (val == null) return 0;
+  if (val is int) return val;
+  if (val is double) return val.round();
+  return (double.tryParse(val.toString()) ?? 0.0).round();
 }

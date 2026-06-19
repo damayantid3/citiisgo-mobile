@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/wisata_model.dart';
 import '../../../providers/wisata_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/notifikasi_provider.dart'; // IMPORT PROVIDER NOTIFIKASI
+import '../../widgets/shimmer_loading.dart';
 
 // Jalur Impor Halaman Fitur Valid
 import '../wisata/wisata_detail_screen.dart';
@@ -45,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<WisataProvider>().loadWisata();
+      context.read<NotifikasiProvider>().fetchNotifikasi();
     });
   }
 
@@ -396,6 +399,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildPopularList(WisataProvider provider) {
+    if (provider.isLoading) {
+      return const ShimmerGridPopular();
+    }
     final listData = provider.popularWisata.isNotEmpty ? provider.popularWisata : _dummyWisataMaster;
     return SizedBox(
       height: 180,
@@ -410,6 +416,41 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildNearbyList(WisataProvider provider) {
+    if (provider.isLoading) {
+      return Column(
+        children: List.generate(3, (index) => Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+            child: Row(
+              children: [
+                const ShimmerPlaceholder(width: 60, height: 60, borderRadius: 10),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const ShimmerPlaceholder(width: 120, height: 14, borderRadius: 4),
+                      const SizedBox(height: 6),
+                      const ShimmerPlaceholder(width: 160, height: 10, borderRadius: 4),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: const [
+                          ShimmerPlaceholder(width: 30, height: 10, borderRadius: 4),
+                          ShimmerPlaceholder(width: 50, height: 12, borderRadius: 4),
+                        ],
+                      )
+                    ],
+                  ),
+                )
+              ],
+            ),
+          ),
+        )),
+      );
+    }
     final listData = provider.nearbyWisata.isNotEmpty ? provider.nearbyWisata : _dummyWisataMaster;
     return Column(children: listData.map((w) => _buildNearbyRowReal(w)).toList());
   }
@@ -430,8 +471,21 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(
               height: 90, 
               width: double.infinity, 
-              decoration: BoxDecoration(color: AppColors.lightGreen, borderRadius: BorderRadius.circular(12)), 
-              child: Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 32))),
+              decoration: BoxDecoration(
+                color: AppColors.lightGreen, 
+                borderRadius: BorderRadius.circular(12),
+              ), 
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: (w.cover != null && w.cover!.isNotEmpty)
+                    ? CachedNetworkImage(
+                        imageUrl: w.cover!,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => const ShimmerPlaceholder(width: double.infinity, height: 90, borderRadius: 12),
+                        errorWidget: (context, url, error) => Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 32))),
+                      )
+                    : Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 32))),
+              ),
             ),
             const SizedBox(height: 8),
             Text(w.nama, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 12.5, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -462,8 +516,21 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(
               width: 60, 
               height: 60, 
-              decoration: BoxDecoration(color: AppColors.lightGreen, borderRadius: BorderRadius.circular(10)), 
-              child: Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 26))),
+              decoration: BoxDecoration(
+                color: AppColors.lightGreen, 
+                borderRadius: BorderRadius.circular(10),
+              ), 
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: (w.cover != null && w.cover!.isNotEmpty)
+                    ? CachedNetworkImage(
+                        imageUrl: w.cover!,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => const ShimmerPlaceholder(width: 60, height: 60, borderRadius: 10),
+                        errorWidget: (context, url, error) => Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 26))),
+                      )
+                    : Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 26))),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(

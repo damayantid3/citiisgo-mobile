@@ -14,11 +14,18 @@ class PeralatanModel {
   });
  
   factory PeralatanModel.fromJson(Map<String, dynamic> j) => PeralatanModel(
-    id: j['id'], nama: j['nama'] ?? '',
+    id: j['id'] ?? 0, nama: j['nama'] ?? '',
     deskripsi: j['deskripsi'],
-    hargaSewaPerHari: j['harga_sewa_per_hari'] ?? 0,
-    totalStok: j['total_stok'] ?? 0,
-    stokTersedia: j['stok_tersedia'] ?? 0,
+    hargaSewaPerHari: _safeInt(j['harga_sewa_per_hari']),
+    totalStok: _safeInt(j['total_stok']),
+    stokTersedia: _safeInt(j['stok_tersedia']),
   );
+}
+
+int _safeInt(dynamic val) {
+  if (val == null) return 0;
+  if (val is int) return val;
+  if (val is double) return val.round();
+  return (double.tryParse(val.toString()) ?? 0.0).round();
 }
  

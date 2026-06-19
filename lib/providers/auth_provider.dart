@@ -128,4 +128,17 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  /// ── Penanganan Sesi Kadaluarsa (401) ──
+  void handleSessionExpired() {
+    _user = null;
+    _error = 'Sesi Anda telah berakhir. Silakan login kembali.';
+    notifyListeners();
+  }
+
+  /// ── Hapus Status Error Setelah Ditampilkan ──
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
 }

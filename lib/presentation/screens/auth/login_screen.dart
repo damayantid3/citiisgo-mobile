@@ -17,6 +17,18 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passCtrl  = TextEditingController();
   bool _obscure   = true;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.error != null && authProvider.error!.contains('Sesi')) {
+        _showSnackBar(authProvider.error!, Colors.redAccent);
+        authProvider.clearError();
+      }
+    });
+  }
+
   // Palet Warna CitiisGo (Identitas Brand Terjaga)
   static const colorPrimary  = Color(0xFF0F7133); 
   static const colorOrange   = Color(0xFFFF7A00); 

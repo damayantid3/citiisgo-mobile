@@ -50,8 +50,14 @@ class ApiService {
   Future<Response> getKamarPenginapan(int penginapanId) =>
       _dio.get('/penginapan/$penginapanId/kamar');
 
-  Future<Response> getPeralatanPublic(int wisataId) =>
-      _dio.get('/wisata/$wisataId/peralatan');
+  Future<Response> getPeralatanPublic(int wisataId, {String? mulai, String? selesai}) =>
+      _dio.get(
+        '/wisata/$wisataId/peralatan',
+        queryParameters: {
+          if (mulai != null) 'mulai': mulai,
+          if (selesai != null) 'selesai': selesai,
+        },
+      );
 
   // ── User: Reservasi ────────────────────────────────────────
   Future<Response> getMyReservasi({int page = 1}) =>
@@ -66,6 +72,9 @@ class ApiService {
   Future<Response> cancelReservasi(int id) =>
       _dio.delete('/user/reservasi/$id');
 
+  Future<Response> completeReservasi(int id) =>
+      _dio.post('/user/reservasi/$id/complete');
+
   // ── User: Booking Camping ──────────────────────────────────
   Future<Response> getMyBookingCamping({int page = 1}) =>
       _dio.get('/user/booking-camping', queryParameters: {'page': page});
@@ -79,6 +88,9 @@ class ApiService {
   Future<Response> cancelBookingCamping(int id) =>
       _dio.delete('/user/booking-camping/$id');
 
+  Future<Response> completeBookingCamping(int id) =>
+      _dio.post('/user/booking-camping/$id/complete');
+
   // ── User: Booking Penginapan ───────────────────────────────
   Future<Response> getMyBookingPenginapan({int page = 1}) =>
       _dio.get('/user/booking-penginapan', queryParameters: {'page': page});
@@ -89,6 +101,9 @@ class ApiService {
   Future<Response> cancelBookingPenginapan(int id) =>
       _dio.delete('/user/booking-penginapan/$id');
 
+  Future<Response> completeBookingPenginapan(int id) =>
+      _dio.post('/user/booking-penginapan/$id/complete');
+
   // ── User: Sewa Peralatan ───────────────────────────────────
   Future<Response> getMySewaPeralatan({int page = 1}) =>
       _dio.get('/user/sewa-peralatan', queryParameters: {'page': page});
@@ -98,6 +113,9 @@ class ApiService {
 
   Future<Response> cancelSewaPeralatan(int id) =>
       _dio.delete('/user/sewa-peralatan/$id');
+
+  Future<Response> completeSewaPeralatan(int id) =>
+      _dio.post('/user/sewa-peralatan/$id/complete');
 
   // ── User: Ulasan ───────────────────────────────────────────
   Future<Response> createUlasan(Map<String, dynamic> data,

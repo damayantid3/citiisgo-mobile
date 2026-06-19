@@ -21,12 +21,12 @@ class PaketCampingModel {
   });
  
   factory PaketCampingModel.fromJson(Map<String, dynamic> j) => PaketCampingModel(
-    id: j['id'], namaPaket: j['nama_paket'] ?? '',
+    id: j['id'] ?? 0, namaPaket: j['nama_paket'] ?? '',
     deskripsi: j['deskripsi'],
-    hargaPerMalam: j['harga_per_malam'] ?? 0,
-    kapasitasTamu: j['kapasitas_tamu'] ?? 0,
-    totalSlot: j['total_slot'] ?? 0,
-    tersedia: j['tersedia'] ?? true,
+    hargaPerMalam: _safeInt(j['harga_per_malam']),
+    kapasitasTamu: _safeInt(j['kapasitas_tamu']),
+    totalSlot: _safeInt(j['total_slot']),
+    tersedia: _safeBool(j['tersedia']),
     wisata: j['wisata'] != null ? WisataModel.fromJson(j['wisata']) : null,
   );
 
@@ -59,4 +59,21 @@ class PaketCampingModel {
       tersedia: true,
     ),
   ];
+}
+
+int _safeInt(dynamic val) {
+  if (val == null) return 0;
+  if (val is int) return val;
+  if (val is double) return val.round();
+  return (double.tryParse(val.toString()) ?? 0.0).round();
+}
+
+bool _safeBool(dynamic val) {
+  if (val == null) return false;
+  if (val is bool) return val;
+  if (val is int) return val == 1;
+  if (val is String) {
+    return val == '1' || val.toLowerCase() == 'true';
+  }
+  return false;
 }
