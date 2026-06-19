@@ -120,14 +120,16 @@ class _WisataDetailScreenState extends State<WisataDetailScreen>
                       decoration: const BoxDecoration(
                         gradient: LinearGradient(colors: [Color(0xFF064E3B), colorPrimary], begin: Alignment.topCenter, end: Alignment.bottomCenter)
                       ),
-                      child: (w.cover != null && w.cover!.isNotEmpty)
-                          ? CachedNetworkImage(
-                              imageUrl: w.cover!,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const ShimmerPlaceholder(width: double.infinity, height: 300, borderRadius: 0),
-                              errorWidget: (context, url, error) => const Center(child: Icon(Icons.landscape_rounded, size: 80, color: Colors.white24)),
-                            )
-                          : const Center(child: Icon(Icons.landscape_rounded, size: 80, color: Colors.white24)),
+                      child: w.localAssetPath != null
+                          ? Image.asset(w.localAssetPath!, fit: BoxFit.cover)
+                          : (w.cover != null && w.cover!.isNotEmpty)
+                              ? CachedNetworkImage(
+                                  imageUrl: w.cover!,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => const ShimmerPlaceholder(width: double.infinity, height: 300, borderRadius: 0),
+                                  errorWidget: (context, url, error) => const Center(child: Icon(Icons.landscape_rounded, size: 80, color: Colors.white24)),
+                                )
+                              : const Center(child: Icon(Icons.landscape_rounded, size: 80, color: Colors.white24)),
                     ),
                     Container(
                       decoration: BoxDecoration(

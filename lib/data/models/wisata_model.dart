@@ -96,6 +96,16 @@ class WisataModel {
     if (rawJarak > 0) return rawJarak;
     return 1.5 + (id % 5) * 1.3;
   }
+
+  String? get localAssetPath {
+    switch (id) {
+      case 1: return 'assets/images/gunung_galunggung.jpg';
+      case 2: return 'assets/images/pemandian_air_panas.jpg';
+      case 3: return 'assets/images/air_terjun_galunggung.jpg';
+      case 4: return 'assets/images/lokasi_camping.jpg';
+      default: return null;
+    }
+  }
 }
 
 int _safeInt(dynamic val) {

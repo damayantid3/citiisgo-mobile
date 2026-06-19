@@ -36,10 +36,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = "";
 
   final List<WisataModel> _dummyWisataMaster = [
-    WisataModel(id: 1, nama: 'Galunggung Peak', deskripsi: 'Kawah indah.', alamat: 'Sukaratu', hargaTiket: 25000, kuotaHarian: 500, status: 'active', rating: 4.8, emoji: '🌋'),
-    WisataModel(id: 2, nama: 'Curug Cimedang', deskripsi: 'Air terjun alami.', alamat: 'Sariwangi', hargaTiket: 15000, kuotaHarian: 300, status: 'active', rating: 4.9, emoji: '💧'),
-    WisataModel(id: 3, nama: 'Pantai Karang Tawulan', deskripsi: 'Pantai tebing eksotis.', alamat: 'Cikalong', hargaTiket: 20000, kuotaHarian: 1000, status: 'active', rating: 4.7, emoji: '🌊'),
-    WisataModel(id: 4, nama: 'Kampung Naga Cultural', deskripsi: 'Adat budaya sunda.', alamat: 'Salawu', hargaTiket: 10000, kuotaHarian: 200, status: 'active', rating: 4.6, emoji: '🏛️'),
+    WisataModel(id: 1, nama: 'Gunung Galunggung', deskripsi: 'Gunung berapi aktif di Tasikmalaya dengan pemandangan kawah hijau yang sangat megah dan menakjubkan.', alamat: 'Sukaratu, Tasikmalaya', hargaTiket: 20000, kuotaHarian: 500, status: 'active', rating: 4.8, emoji: '🌋'),
+    WisataModel(id: 2, nama: 'Pemandian air panas', deskripsi: 'Nikmati sensasi berendam air panas alami yang kaya belerang di kaki Gunung Galunggung.', alamat: 'Sukaratu, Tasikmalaya', hargaTiket: 15000, kuotaHarian: 300, status: 'active', rating: 4.9, emoji: '♨️'),
+    WisataModel(id: 3, nama: 'Air terjun Galunggung', deskripsi: 'Destinasi air terjun tersembunyi dengan aliran air yang jernih dan segar di kawasan lereng Gunung Galunggung.', alamat: 'Sukaratu, Tasikmalaya', hargaTiket: 15000, kuotaHarian: 200, status: 'active', rating: 4.7, emoji: '💧'),
+    WisataModel(id: 4, nama: 'Lokasi Camping', deskripsi: 'Area perkemahan eksklusif di tepi danau/kolam alam yang tenang di kawasan wisata Galunggung.', alamat: 'Sukaratu, Tasikmalaya', hargaTiket: 25000, kuotaHarian: 150, status: 'active', rating: 4.6, emoji: '⛺'),
   ];
 
   @override
@@ -477,14 +477,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ), 
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: (w.cover != null && w.cover!.isNotEmpty)
-                    ? CachedNetworkImage(
-                        imageUrl: w.cover!,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => const ShimmerPlaceholder(width: double.infinity, height: 90, borderRadius: 12),
-                        errorWidget: (context, url, error) => Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 32))),
-                      )
-                    : Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 32))),
+                child: w.localAssetPath != null
+                    ? Image.asset(w.localAssetPath!, fit: BoxFit.cover)
+                    : (w.cover != null && w.cover!.isNotEmpty)
+                        ? CachedNetworkImage(
+                            imageUrl: w.cover!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => const ShimmerPlaceholder(width: double.infinity, height: 90, borderRadius: 12),
+                            errorWidget: (context, url, error) => Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 32))),
+                          )
+                        : Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 32))),
               ),
             ),
             const SizedBox(height: 8),
@@ -522,14 +524,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ), 
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: (w.cover != null && w.cover!.isNotEmpty)
-                    ? CachedNetworkImage(
-                        imageUrl: w.cover!,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => const ShimmerPlaceholder(width: 60, height: 60, borderRadius: 10),
-                        errorWidget: (context, url, error) => Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 26))),
-                      )
-                    : Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 26))),
+                child: w.localAssetPath != null
+                    ? Image.asset(w.localAssetPath!, fit: BoxFit.cover)
+                    : (w.cover != null && w.cover!.isNotEmpty)
+                        ? CachedNetworkImage(
+                            imageUrl: w.cover!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => const ShimmerPlaceholder(width: 60, height: 60, borderRadius: 10),
+                            errorWidget: (context, url, error) => Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 26))),
+                          )
+                        : Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 26))),
               ),
             ),
             const SizedBox(width: 12),
@@ -618,7 +622,19 @@ class _HomeScreenState extends State<HomeScreen> {
                               Container(
                                 width: 75, height: 75, 
                                 decoration: BoxDecoration(color: const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(14)), 
-                                child: Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 30))),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: w.localAssetPath != null
+                                      ? Image.asset(w.localAssetPath!, fit: BoxFit.cover)
+                                      : (w.cover != null && w.cover!.isNotEmpty)
+                                          ? CachedNetworkImage(
+                                              imageUrl: w.cover!,
+                                              fit: BoxFit.cover,
+                                              placeholder: (context, url) => const ShimmerPlaceholder(width: 75, height: 75, borderRadius: 14),
+                                              errorWidget: (context, url, error) => Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 30))),
+                                            )
+                                          : Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 30))),
+                                ),
                               ),
                               const SizedBox(width: 14),
                               Expanded(
