@@ -218,6 +218,7 @@ class BookingRepository {
     if (fallbackStatus == 'confirmed') return 'Lunas';
     final s = pembayaran?['status'];
     if (s == 'paid' || s == 'settlement' || s == 'success') return 'Lunas';
+    if (s == 'failed' || s == 'expire' || s == 'cancelled' || s == 'deny') return 'Dibatalkan';
     return 'Belum Dibayar';
   }
 

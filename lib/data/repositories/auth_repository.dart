@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/network/api_service.dart';
 import '../models/user_model.dart';
@@ -72,9 +73,22 @@ class AuthRepository {
     return token != null && token.isNotEmpty;
   }
  
-  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data, {XFile? file}) async {
     try {
-      final res = await _api.updateProfile(data);
+      Response res;
+      if (file != null) {
+        final Map<String, dynamic> map = Map<String, dynamic>.from(data);
+        map['_method'] = 'PUT';
+        final bytes = await file.readAsBytes();
+        map['foto_profil'] = MultipartFile.fromBytes(
+          bytes,
+          filename: file.name,
+        );
+        final formData = FormData.fromMap(map);
+        res = await _api.updateProfileMultipart(formData);
+      } else {
+        res = await _api.updateProfile(data);
+      }
       final body = res.data;
       if (body['success'] == true) {
         final user = UserModel.fromJson(body['data']);
@@ -85,6 +99,8 @@ class AuthRepository {
     } on DioException catch (e) {
       final errorMessage = e.response?.data?['message'] ?? 'Gagal memperbarui profil.';
       return {'success': false, 'message': errorMessage};
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal memproses file gambar: $e'};
     }
   }
 }

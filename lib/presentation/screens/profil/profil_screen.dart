@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/config/app_colors.dart';
+import '../../../core/config/api_config.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/repositories/auth_repository.dart';
+import '../../../data/repositories/booking_repository.dart';
 import '../auth/login_screen.dart';
+import '../reservasi/tiket_list_screen.dart';
+import '../notifikasi/notifikasi_screen.dart';
 
 class ProfilScreen extends StatefulWidget {
   const ProfilScreen({super.key});
@@ -13,8 +19,13 @@ class ProfilScreen extends StatefulWidget {
 
 class _ProfilScreenState extends State<ProfilScreen> {
   final _authRepo = AuthRepository();
+  final _bookingRepo = BookingRepository();
   UserModel? _user;
   bool _loading = true;
+
+  int _totalTrip = 0;
+  int _selesai = 0;
+  int _menunggu = 0;
 
   // Palet Konsisten Komponen Premium CitiisGo
   static const colorPrimary  = Color(0xFF0F7133);
@@ -28,11 +39,72 @@ class _ProfilScreenState extends State<ProfilScreen> {
   void initState() {
     super.initState();
     _loadUser();
+    _loadStats();
   }
 
   Future<void> _loadUser() async {
     final u = await _authRepo.getLocalUser();
     if (mounted) setState(() { _user = u; _loading = false; });
+  }
+
+  Future<void> _loadStats() async {
+    try {
+      final bookings = await _bookingRepo.getRiwayatFromApi();
+      if (mounted) {
+        setState(() {
+          _totalTrip = bookings.where((b) {
+            final s = b['status']?.toString().toLowerCase() ?? '';
+            return s != 'dibatalkan' && s != 'cancelled';
+          }).length;
+          _selesai = bookings.where((b) => b['status'] == 'Selesai').length;
+          _menunggu = bookings.where((b) => b['status'] == 'Belum Dibayar').length;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _updateProfilePhoto() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (pickedFile == null) return;
+
+    setState(() { _loading = true; });
+
+    try {
+      final r = await _authRepo.updateProfile({
+        'nama': _user?.nama ?? '',
+        'no_hp': _user?.noHp ?? '',
+      }, file: pickedFile);
+
+      if (mounted) {
+        if (r['success'] == true) {
+          setState(() { _user = r['user']; });
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Foto profil berhasil diperbarui', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+            backgroundColor: colorPrimary,
+            behavior: SnackBarBehavior.floating,
+          ));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(r['message'] ?? 'Gagal memperbarui foto profil', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ));
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Terjadi kesalahan: $e', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } finally {
+      if (mounted) {
+        setState(() { _loading = false; });
+      }
+    }
   }
 
   Future<void> _logout() async {
@@ -147,30 +219,51 @@ class _ProfilScreenState extends State<ProfilScreen> {
                           const SizedBox(height: 24),
                           
                           // Avatar Bulat Mengambang
-                          Stack(
-                            alignment: Alignment.bottomRight,
-                            children: [
-                              Container(
-                                width: 88, height: 88,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: colorOrange,
-                                  border: Border.all(color: Colors.white, width: 3),
-                                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(.12), blurRadius: 16, offset: const Offset(0, 8))],
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    _user?.nama.isNotEmpty == true ? _user!.nama[0].toUpperCase() : 'U',
-                                    style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800),
+                          GestureDetector(
+                            onTap: _updateProfilePhoto,
+                            child: Stack(
+                              alignment: Alignment.bottomRight,
+                              children: [
+                                Container(
+                                  width: 88, height: 88,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: colorOrange,
+                                    border: Border.all(color: Colors.white, width: 3),
+                                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(.12), blurRadius: 16, offset: const Offset(0, 8))],
                                   ),
+                                  child: _user?.fotoProfil != null && _user!.fotoProfil!.isNotEmpty
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(44),
+                                          child: CachedNetworkImage(
+                                            imageUrl: '${ApiConfig.baseUrl.replaceAll("/api/v1", "/storage")}/${_user!.fotoProfil}',
+                                            fit: BoxFit.cover,
+                                            placeholder: (context, url) => const Padding(
+                                              padding: EdgeInsets.all(20),
+                                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                            ),
+                                            errorWidget: (context, url, error) => Center(
+                                              child: Text(
+                                                _user?.nama.isNotEmpty == true ? _user!.nama[0].toUpperCase() : 'U',
+                                                style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800),
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : Center(
+                                          child: Text(
+                                            _user?.nama.isNotEmpty == true ? _user!.nama[0].toUpperCase() : 'U',
+                                            style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800),
+                                          ),
+                                        ),
                                 ),
-                              ),
-                              Container(
-                                width: 28, height: 28,
-                                decoration: const BoxDecoration(color: colorOrange, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6)]),
-                                child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 14),
-                              ),
-                            ],
+                                Container(
+                                  width: 28, height: 28,
+                                  decoration: const BoxDecoration(color: colorOrange, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6)]),
+                                  child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 14),
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 16),
                           Text(_user?.nama ?? 'Wisatawan', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.2)),
@@ -205,11 +298,11 @@ class _ProfilScreenState extends State<ProfilScreen> {
                     ),
                     child: Row(
                       children: [
-                        _statItem('4', 'Total Trip', colorPrimary),
+                        _statItem(_totalTrip.toString(), 'Total Trip', colorPrimary),
                         _vDiv(),
-                        _statItem('3', 'Selesai', colorOrange),
+                        _statItem(_selesai.toString(), 'Selesai', colorOrange),
                         _vDiv(),
-                        _statItem('1', 'Menunggu', AppColors.info),
+                        _statItem(_menunggu.toString(), 'Menunggu', AppColors.info),
                         _vDiv(),
                         _statItem('12', 'Ulasan', const Color(0xFF7C3AED)),
                       ],
@@ -225,8 +318,22 @@ class _ProfilScreenState extends State<ProfilScreen> {
                   child: Column(
                     children: [
                       _menuSection('AKTIVITAS AKUN', [
-                        _menuItem(Icons.receipt_long_rounded, 'Riwayat Transaksi', 'Kelola seluruh pesanan tiket & sewa', colorPrimary, () {}),
-                        _menuItem(Icons.notifications_active_rounded, 'Pemberitahuan', 'Lihat pesan masuk terbaru', colorOrange, () {}),
+                        _menuItem(Icons.receipt_long_rounded, 'Riwayat Transaksi', 'Kelola seluruh pesanan tiket & sewa', colorPrimary, () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TiketListScreen(showOnlyCompleted: true),
+                            ),
+                          ).then((_) => _loadStats());
+                        }),
+                        _menuItem(Icons.notifications_active_rounded, 'Pemberitahuan', 'Lihat pesan masuk terbaru', colorOrange, () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const NotifikasiScreen(),
+                            ),
+                          );
+                        }),
                         _menuItem(Icons.star_rate_rounded, 'Ulasan Saya', 'Komentar destinasi pariwisata', const Color(0xFFEAB308), () {}),
                         _menuItem(Icons.bookmark_rounded, 'Destinasi Favorit', 'Lokasi camping pilihan tersimpan', Colors.redAccent, () {}),
                       ]),

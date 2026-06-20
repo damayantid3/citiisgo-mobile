@@ -20,6 +20,9 @@ class ApiService {
   Future<Response> updateProfile(Map<String, dynamic> data) =>
       _dio.put('/auth/profile', data: data);
 
+  Future<Response> updateProfileMultipart(FormData data) =>
+      _dio.post('/auth/profile', data: data);
+
   // ── Wisata (Public) ────────────────────────────────────────
   Future<Response> getWisata({
     String? search,

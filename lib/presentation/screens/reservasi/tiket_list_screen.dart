@@ -8,7 +8,8 @@ import '../../../providers/notifikasi_provider.dart'; // Import provider notifik
 import '../pembayaran/pembayaran_screen.dart';
 
 class TiketListScreen extends StatefulWidget {
-  const TiketListScreen({super.key});
+  final bool showOnlyCompleted;
+  const TiketListScreen({super.key, this.showOnlyCompleted = false});
 
   @override
   State<TiketListScreen> createState() => _TiketListScreenState();
@@ -17,20 +18,22 @@ class TiketListScreen extends StatefulWidget {
 class _TiketListScreenState extends State<TiketListScreen>
     with SingleTickerProviderStateMixin {
   final BookingRepository _bookingRepo = BookingRepository();
-  late TabController _tabController;
+  TabController? _tabController;
   List<Map<String, dynamic>> _allTickets = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    if (!widget.showOnlyCompleted) {
+      _tabController = TabController(length: 3, vsync: this);
+    }
     _fetchTickets();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController?.dispose();
     super.dispose();
   }
 
@@ -52,6 +55,8 @@ class _TiketListScreenState extends State<TiketListScreen>
       return _allTickets.where((t) => t['status'] == 'Belum Dibayar').toList();
     } else if (tabStatus == 'active') {
       return _allTickets.where((t) => t['status'] == 'Lunas').toList();
+    } else if (tabStatus == 'completed_only') {
+      return _allTickets.where((t) => t['status'] == 'Selesai').toList();
     } else {
       return _allTickets
           .where((t) => t['status'] == 'Dibatalkan' || t['status'] == 'Selesai')
@@ -144,6 +149,34 @@ class _TiketListScreenState extends State<TiketListScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.showOnlyCompleted) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text('Riwayat Transaksi Selesai',
+              style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  color: Colors.white)),
+          centerTitle: true,
+          automaticallyImplyLeading: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+            onPressed: () => Navigator.pop(context),
+          ),
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(gradient: AppColors.heroGradient),
+          ),
+          elevation: 0,
+        ),
+        body: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                    color: AppColors.primaryGreen, strokeWidth: 3))
+            : _buildTicketListContent('completed_only'),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -261,6 +294,10 @@ class _TiketListScreenState extends State<TiketListScreen>
         badgeTextColor = AppColors.textSecondary;
         statusLabel = 'Selesai';
       }
+    } else if (statusTab == 'completed_only') {
+      badgeColor = const Color(0xFFF1F5F9);
+      badgeTextColor = AppColors.textSecondary;
+      statusLabel = 'Selesai';
     }
 
     return Container(
@@ -398,7 +435,7 @@ class _TiketListScreenState extends State<TiketListScreen>
                         if (mounted) {
                           await _fetchTickets();
                           if (paid == true) {
-                            _tabController.animateTo(1);
+                            _tabController?.animateTo(1);
                           }
                         }
                       },
