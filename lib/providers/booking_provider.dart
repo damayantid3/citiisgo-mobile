@@ -1,78 +1,44 @@
 import 'package:flutter/material.dart';
-import '../data/models/paket_camping_model.dart';
+import '../data/repositories/booking_repository_api.dart';
 
+/// Provider untuk mengelola riwayat semua booking wisatawan
+/// Daftarkan di main.dart → MultiProvider
 class BookingProvider extends ChangeNotifier {
-  // Camping booking state
-  PaketCampingModel? _selectedPaket;
-  DateTime? _checkIn;
-  DateTime? _checkOut;
-  int _jumlahTamu = 2;
-  String _catatan = '';
+  final BookingRepositoryApi _repo = BookingRepositoryApi();
+
+  List<Map<String, dynamic>> _riwayat = [];
   bool _isLoading = false;
-  bool _bookingSuccess = false;
+  String? _error;
 
-  PaketCampingModel? get selectedPaket => _selectedPaket;
-  DateTime? get checkIn => _checkIn;
-  DateTime? get checkOut => _checkOut;
-  int get jumlahTamu => _jumlahTamu;
-  String get catatan => _catatan;
+  List<Map<String, dynamic>> get riwayat => _riwayat;
   bool get isLoading => _isLoading;
-  bool get bookingSuccess => _bookingSuccess;
+  String? get error => _error;
 
-  int get jumlahMalam => (_checkOut != null && _checkIn != null)
-      ? _checkOut!.difference(_checkIn!).inDays
-      : 0;
+  /// Hitung jumlah booking per tipe
+  int countByTipe(String tipe) =>
+      _riwayat.where((r) => r['tipe'] == tipe).length;
 
-  int get totalHarga {
-    if (_selectedPaket == null) return 0;
-    return (_selectedPaket!.hargaPerMalam * jumlahMalam) + 10000; // biaya layanan
-  }
-
-  void setPaket(PaketCampingModel paket) {
-    _selectedPaket = paket;
-    notifyListeners();
-  }
-
-  void setCheckIn(DateTime date) {
-    _checkIn = date;
-    if (_checkOut != null && _checkOut!.isBefore(date)) _checkOut = null;
-    notifyListeners();
-  }
-
-  void setCheckOut(DateTime date) {
-    _checkOut = date;
-    notifyListeners();
-  }
-
-  void setJumlahTamu(int tamu) {
-    _jumlahTamu = tamu;
-    notifyListeners();
-  }
-
-  void setCatatan(String val) {
-    _catatan = val;
-    notifyListeners();
-  }
-
-  Future<bool> submitBooking() async {
+  /// Load semua riwayat dari API (tiket + camping + penginapan + alat)
+  Future<void> loadRiwayat() async {
     _isLoading = true;
+    _error = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      _riwayat = await _repo.getRiwayatLengkap();
+    } catch (e) {
+      _error = 'Gagal memuat riwayat: $e';
+    }
 
-    _bookingSuccess = true;
     _isLoading = false;
     notifyListeners();
-    return true;
   }
 
-  void reset() {
-    _selectedPaket = null;
-    _checkIn = null;
-    _checkOut = null;
-    _jumlahTamu = 2;
-    _catatan = '';
-    _bookingSuccess = false;
-    notifyListeners();
+  Future<void> refresh() => loadRiwayat();
+
+  Future<bool> cancelBooking(String tipe, int id) async {
+    final success = await _repo.cancelBooking(tipe, id);
+    if (success) await loadRiwayat();
+    return success;
   }
 }

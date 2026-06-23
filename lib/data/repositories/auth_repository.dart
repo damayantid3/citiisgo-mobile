@@ -83,8 +83,9 @@ class AuthRepository {
       }
       return {'success': false, 'message': body['message']};
     } on DioException catch (e) {
-      final errorMessage = e.response?.data?['message'] ?? 'Gagal memperbarui profil.';
-      return {'success': false, 'message': errorMessage};
-    }
+  print("DEBUG INFO DARI BACKEND: ${e.response?.data}"); // ⬅️ Tambahkan baris ini
+  final errorMessage = e.response?.data?['message'] ?? 'Gagal mendaftarkan akun.';
+  return {'success': false, 'message': errorMessage};
+}
   }
 }

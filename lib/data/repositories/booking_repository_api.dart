@@ -1,7 +1,8 @@
 import '../../core/network/api_service.dart';
 
-/// Repository yang menghubungkan semua transaksi booking ke citiisgo-API
-/// Menggantikan BookingRepository (yang masih pakai data lokal/memori)
+/// CitiisGo — BookingRepositoryApi
+/// Menghubungkan semua transaksi booking wisatawan ke citiisgo-API (port 8001)
+/// Gantikan BookingRepository (lokal/memori) dengan class ini.
 class BookingRepositoryApi {
   static final BookingRepositoryApi _instance =
       BookingRepositoryApi._internal();
@@ -10,7 +11,7 @@ class BookingRepositoryApi {
 
   final ApiService _api = ApiService();
 
-  // ── 1. Tiket Masuk ──────────────────────────────────────────
+  // ── 1. Tiket Masuk ─────────────────────────────────────────────────────
   /// POST /api/v1/user/reservasi
   Future<Map<String, dynamic>> createBookingTiket(
       Map<String, dynamic> data) async {
@@ -33,7 +34,12 @@ class BookingRepositoryApi {
     }
   }
 
-  // ── 2. Booking Camping ───────────────────────────────────────
+  // Alias untuk kompatibilitas dengan kode lama
+  Future<Map<String, dynamic>> createReservasi(
+          Map<String, dynamic> data) async =>
+      createBookingTiket(data);
+
+  // ── 2. Booking Camping ──────────────────────────────────────────────────
   /// POST /api/v1/user/booking-camping
   Future<Map<String, dynamic>> createBookingCamping(
       Map<String, dynamic> data) async {
@@ -56,7 +62,7 @@ class BookingRepositoryApi {
     }
   }
 
-  // ── 3. Booking Penginapan ────────────────────────────────────
+  // ── 3. Booking Penginapan ───────────────────────────────────────────────
   /// POST /api/v1/user/booking-penginapan
   Future<Map<String, dynamic>> createBookingPenginapan(
       Map<String, dynamic> data) async {
@@ -79,9 +85,9 @@ class BookingRepositoryApi {
     }
   }
 
-  // ── 4. Sewa Peralatan ────────────────────────────────────────
+  // ── 4. Sewa Peralatan ───────────────────────────────────────────────────
   /// POST /api/v1/user/sewa-peralatan
-  Future<Map<String, dynamic>> createSewaPeralatan(
+  Future<Map<String, dynamic>> createBookingAlat(
       Map<String, dynamic> data) async {
     try {
       final res = await _api.createSewaPeralatan(data);
@@ -102,94 +108,101 @@ class BookingRepositoryApi {
     }
   }
 
-  // ── 5. Ambil Riwayat Semua Booking ──────────────────────────
+  // ── 5. Ambil Semua Riwayat Booking ─────────────────────────────────────
+  /// Menggabungkan tiket + camping + penginapan + alat dari 4 endpoint API
   Future<List<Map<String, dynamic>>> getRiwayatLengkap() async {
     final List<Map<String, dynamic>> riwayat = [];
 
+    // Tiket masuk
     try {
-      // Tiket masuk
       final resT = await _api.getMyReservasi();
       if (resT.data['success'] == true) {
-        final List list = resT.data['data']['data'] ?? resT.data['data'] ?? [];
+        final List list =
+            resT.data['data']?['data'] ?? resT.data['data'] ?? [];
         for (final item in list) {
           riwayat.add({
             'id': item['id'].toString(),
             'tipe': 'Tiket Masuk',
-            'layanan': 'Tiket Masuk Wisata',
+            'layanan': 'Tiket Masuk Wisata Citiis',
             'tanggal': item['tanggal_kunjungan'] ?? '-',
             'detail': '${item['jumlah_tiket'] ?? 1} Orang',
             'total_harga': item['total_harga'] ?? 0,
-            'status': item['status'] ?? 'pending',
+            'status': _normalizeStatus(item['status']),
           });
         }
       }
     } catch (_) {}
 
+    // Camping
     try {
-      // Camping
       final resC = await _api.getMyBookingCamping();
       if (resC.data['success'] == true) {
-        final List list = resC.data['data']['data'] ?? resC.data['data'] ?? [];
+        final List list =
+            resC.data['data']?['data'] ?? resC.data['data'] ?? [];
         for (final item in list) {
           riwayat.add({
             'id': item['id'].toString(),
             'tipe': 'Sewa Camp',
-            'layanan': item['paket_camping']?['nama_paket'] ?? 'Paket Camping',
+            'layanan':
+                item['paket_camping']?['nama_paket'] ?? 'Paket Camping',
             'tanggal':
                 '${item['tanggal_checkin'] ?? "-"} s/d ${item['tanggal_checkout'] ?? "-"}',
             'detail': '${item['jumlah_tamu'] ?? 1} Peserta',
             'total_harga': item['total_harga'] ?? 0,
-            'status': item['status'] ?? 'pending',
+            'status': _normalizeStatus(item['status']),
           });
         }
       }
     } catch (_) {}
 
+    // Penginapan
     try {
-      // Penginapan
       final resP = await _api.getMyBookingPenginapan();
       if (resP.data['success'] == true) {
-        final List list = resP.data['data']['data'] ?? resP.data['data'] ?? [];
+        final List list =
+            resP.data['data']?['data'] ?? resP.data['data'] ?? [];
         for (final item in list) {
           riwayat.add({
             'id': item['id'].toString(),
             'tipe': 'Penginapan',
-            'layanan': item['kamar']?['tipe_kamar'] ?? 'Kamar Resort',
+            'layanan':
+                item['kamar']?['tipe_kamar'] ?? 'Kamar Resort Wisata',
             'tanggal':
                 '${item['tanggal_checkin'] ?? "-"} s/d ${item['tanggal_checkout'] ?? "-"}',
             'detail': 'Akomodasi Kamar',
             'total_harga': item['total_harga'] ?? 0,
-            'status': item['status'] ?? 'pending',
+            'status': _normalizeStatus(item['status']),
           });
         }
       }
     } catch (_) {}
 
+    // Sewa alat
     try {
-      // Sewa Alat
       final resA = await _api.getMySewaPeralatan();
       if (resA.data['success'] == true) {
-        final List list = resA.data['data']['data'] ?? resA.data['data'] ?? [];
+        final List list =
+            resA.data['data']?['data'] ?? resA.data['data'] ?? [];
         for (final item in list) {
           riwayat.add({
             'id': item['id'].toString(),
             'tipe': 'Sewa Alat',
             'layanan': 'Sewa Peralatan Camping',
             'tanggal': 'Durasi: ${item['durasi_hari'] ?? 1} Hari',
-            'detail': '${item['items']?.length ?? 0} Barang',
+            'detail': '${(item['items'] as List?)?.length ?? 0} Barang',
             'total_harga': item['total_harga'] ?? 0,
-            'status': item['status'] ?? 'pending',
+            'status': _normalizeStatus(item['status']),
           });
         }
       }
     } catch (_) {}
 
-    // Urutkan: terbaru di atas
+    // Terbaru di atas
     riwayat.sort((a, b) => b['id'].compareTo(a['id']));
     return riwayat;
   }
 
-  // ── 6. Batalkan Booking ──────────────────────────────────────
+  // ── 6. Batalkan Booking ─────────────────────────────────────────────────
   Future<bool> cancelBooking(String tipe, int id) async {
     try {
       switch (tipe) {
@@ -210,6 +223,25 @@ class BookingRepositoryApi {
       }
     } catch (_) {
       return false;
+    }
+  }
+
+  // ── Helper ───────────────────────────────────────────────────────────────
+  /// Normalisasi status dari API ke label tampilan
+  String _normalizeStatus(dynamic status) {
+    switch (status?.toString().toLowerCase()) {
+      case 'pending':
+        return 'Belum Dibayar';
+      case 'confirmed':
+        return 'Terkonfirmasi';
+      case 'completed':
+      case 'paid':
+        return 'Lunas';
+      case 'cancelled':
+      case 'canceled':
+        return 'Dibatalkan';
+      default:
+        return status?.toString() ?? 'Belum Dibayar';
     }
   }
 }

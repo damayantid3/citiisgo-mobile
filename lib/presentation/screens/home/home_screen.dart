@@ -6,17 +6,15 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/wisata_model.dart';
 import '../../../providers/wisata_provider.dart';
 import '../../../providers/auth_provider.dart';
-import '../../../providers/notifikasi_provider.dart'; // IMPORT PROVIDER NOTIFIKASI
+import '../../../providers/notifikasi_provider.dart';
 
-// Jalur Impor Halaman Fitur Valid
 import '../wisata/wisata_detail_screen.dart';
-import '../reservasi/reservasi_screen.dart';
 import '../camping/booking_camping_screen.dart';
 import '../penginapan/booking_penginapan_screen.dart';
 import '../peralatan/sewa_peralatan_screen.dart';
 import '../notifikasi/notifikasi_screen.dart';
 import '../profil/profil_screen.dart';
-import '../reservasi/tiket_list_screen.dart'; 
+import '../reservasi/tiket_list_screen.dart';
 import '../tiket/booking_tiket_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -28,23 +26,19 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _navIndex = 0;
-  final List<String> _kategoriList = ['🌿 Semua', '🏔️ Gunung', '🌊 Pantai', '💧 Air Terjun', '🏛️ Budaya'];
-  
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = "";
-
-  final List<WisataModel> _dummyWisataMaster = [
-    WisataModel(id: 1, nama: 'Galunggung Peak', deskripsi: 'Kawah indah.', alamat: 'Sukaratu', hargaTiket: 25000, kuotaHarian: 500, status: 'active', rating: 4.8, emoji: '🌋'),
-    WisataModel(id: 2, nama: 'Curug Cimedang', deskripsi: 'Air terjun alami.', alamat: 'Sariwangi', hargaTiket: 15000, kuotaHarian: 300, status: 'active', rating: 4.9, emoji: '💧'),
-    WisataModel(id: 3, nama: 'Pantai Karang Tawulan', deskripsi: 'Pantai tebing eksotis.', alamat: 'Cikalong', hargaTiket: 20000, kuotaHarian: 1000, status: 'active', rating: 4.7, emoji: '🌊'),
-    WisataModel(id: 4, nama: 'Kampung Naga Cultural', deskripsi: 'Adat budaya sunda.', alamat: 'Salawu', hargaTiket: 10000, kuotaHarian: 200, status: 'active', rating: 4.6, emoji: '🏛️'),
-  ];
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<WisataProvider>().loadWisata();
+      // ✅ Load data nyata dari API — bukan dummy lagi
+      final wp = context.read<WisataProvider>();
+      wp.loadWisata(refresh: true);
+      wp.loadKategori();
+      // Load notifikasi dari API
+      context.read<NotifikasiProvider>().loadNotifikasiDariApi();
     });
   }
 
@@ -56,10 +50,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildBody() {
     switch (_navIndex) {
-      case 1: return _buildJelajahTab();
-      case 2: return const TiketListScreen(); 
-      case 3: return const ProfilScreen();
-      default: return _buildHomeTab();
+      case 1:
+        return _buildJelajahTab();
+      case 2:
+        return const TiketListScreen();
+      case 3:
+        return const ProfilScreen();
+      default:
+        return _buildHomeTab();
     }
   }
 
@@ -72,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ── Bottom Navigation ──────────────────────────────────────────────────
   Widget _buildBottomNav() {
     final items = [
       {'icon': Icons.home_rounded, 'label': 'Beranda'},
@@ -83,7 +82,11 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: AppColors.white,
         boxShadow: [
-          BoxShadow(color: AppColors.textPrimary.withOpacity(0.06), blurRadius: 20, offset: const Offset(0, -4))
+          BoxShadow(
+            color: AppColors.textPrimary.withOpacity(0.06),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          )
         ],
       ),
       child: SafeArea(
@@ -99,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     setState(() {
                       _navIndex = e.key;
                       if (_navIndex != 1) {
-                        _searchQuery = "";
+                        _searchQuery = '';
                         _searchController.clear();
                       }
                     });
@@ -133,233 +136,551 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ── Tab Beranda ────────────────────────────────────────────────────────
   Widget _buildHomeTab() {
     return Consumer2<WisataProvider, AuthProvider>(
-      builder: (context, wisataP, authP, child) {
-        return CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(24, 60, 24, 30),
-                decoration: const BoxDecoration(
-                  gradient: AppColors.heroGradient,
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(24),
-                    bottomRight: Radius.circular(24),
+      builder: (context, wisataP, authP, _) {
+        return RefreshIndicator(
+          onRefresh: () async {
+            await wisataP.loadWisata(refresh: true);
+            await wisataP.loadKategori();
+          },
+          color: AppColors.primaryGreen,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            slivers: [
+              // ── Hero Header ──
+              SliverToBoxAdapter(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(24, 60, 24, 30),
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.heroGradient,
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(24),
+                      bottomRight: Radius.circular(24),
+                    ),
                   ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Selamat petualang, 👋', style: GoogleFonts.plusJakartaSans(fontSize: 13, color: Colors.white70, fontWeight: FontWeight.w500)),
-                            const SizedBox(height: 4),
-                            Text(authP.user?.nama ?? 'Wisatawan CitiisGo', style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white)),
-                          ],
-                        ),
-                        
-                        // INTEGRASI BADGE LONCENG NOTIFIKASI AKTIF
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const NotifikasiScreen()));
-                          },
-                          child: Consumer<NotifikasiProvider>(
-                            builder: (context, notifP, child) {
-                              final bool adaPesanBelumDibaca = notifP.listNotifikasi.any((n) => !n.isRead);
-                              return Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Container(
-                                    width: 42, height: 42,
-                                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
-                                    child: const Center(child: Icon(Icons.notifications_none_rounded, color: Colors.white, size: 22)),
-                                  ),
-                                  if (adaPesanBelumDibaca)
-                                    Positioned(
-                                      top: 2,
-                                      right: 2,
-                                      child: Container(
-                                        width: 11,
-                                        height: 11,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.danger,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(color: const Color(0xFF0F7133), width: 1.5),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Selamat petualang, 👋',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                // ✅ Nama user dari API (AuthProvider)
+                                authP.user?.nama ?? 'Wisatawan CitiisGo',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          // ── Tombol Notifikasi ──
+                          GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const NotifikasiScreen(),
+                              ),
+                            ),
+                            child: Consumer<NotifikasiProvider>(
+                              builder: (_, notifP, __) {
+                                final adaBelumDibaca = notifP.listNotifikasi
+                                    .any((n) => !n.isRead);
+                                return Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Container(
+                                      width: 42,
+                                      height: 42,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.15),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.notifications_none_rounded,
+                                          color: Colors.white,
+                                          size: 22,
                                         ),
                                       ),
                                     ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    Container(
-                      height: 52,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 22),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              onChanged: (val) {
-                                setState(() {
-                                  _searchQuery = val;
-                                  _navIndex = 1; 
-                                });
+                                    if (adaBelumDibaca)
+                                      Positioned(
+                                        top: 2,
+                                        right: 2,
+                                        child: Container(
+                                          width: 11,
+                                          height: 11,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.danger,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: const Color(0xFF0F7133),
+                                              width: 1.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
                               },
-                              decoration: InputDecoration(
-                                hintText: 'Cari destinasi alam pilihanmu...',
-                                hintStyle: GoogleFonts.plusJakartaSans(fontSize: 13.5, color: AppColors.textMuted),
-                                border: InputBorder.none, isDense: true,
-                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 24),
+                      // ── Search Bar ──
+                      Container(
+                        height: 52,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            )
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.search_rounded,
+                              color: AppColors.textSecondary,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                onChanged: (val) {
+                                  setState(() {
+                                    _searchQuery = val;
+                                    _navIndex = 1;
+                                  });
+                                },
+                                decoration: InputDecoration(
+                                  hintText: 'Cari destinasi alam pilihanmu...',
+                                  hintStyle: GoogleFonts.plusJakartaSans(
+                                    fontSize: 13.5,
+                                    color: AppColors.textMuted,
+                                  ),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── Konten Utama ──
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 24,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Banner promo
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF0F7133), Color(0xFF16A34A)],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Diskon Spesial Camp! 🏕️',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Dapatkan potongan tiket hingga 20% khusus bulan ini.',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+
+                      // ── Layanan CitiisGo ──
+                      _buildSectionTitle('Layanan CitiisGo'),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildServiceItem(
+                            icon: Icons.confirmation_number_rounded,
+                            label: 'Tiket Masuk',
+                            bgColor: AppColors.lightGreen,
+                            iconColor: AppColors.primaryGreen,
+                            onTap: () {
+                              // ✅ wisataId dari wisata pertama di API
+                              final id = wisataP.allWisata.isNotEmpty
+                                  ? wisataP.allWisata.first.id
+                                  : 1;
+                              final harga = wisataP.allWisata.isNotEmpty
+                                  ? wisataP.allWisata.first.hargaTiket
+                                  : 25000;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => BookingTiketScreen(
+                                    wisataId: id,
+                                    hargaTiket: harga, // ✅ dari API, bukan hardcode
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          _buildServiceItem(
+                            icon: Icons.home_rounded,
+                            label: 'Sewa Camp',
+                            bgColor: AppColors.lightOrange,
+                            iconColor: AppColors.primaryOrange,
+                            onTap: () {
+                              final id = wisataP.allWisata.isNotEmpty
+                                  ? wisataP.allWisata.first.id
+                                  : 1;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      BookingCampingScreen(wisataId: id),
+                                ),
+                              );
+                            },
+                          ),
+                          _buildServiceItem(
+                            icon: Icons.business_rounded,
+                            label: 'Penginapan',
+                            bgColor: const Color(0xFFEFF6FF),
+                            iconColor: AppColors.info,
+                            onTap: () {
+                              final id = wisataP.allWisata.isNotEmpty
+                                  ? wisataP.allWisata.first.id
+                                  : 1;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      BookingPenginapanScreen(wisataId: id),
+                                ),
+                              );
+                            },
+                          ),
+                          _buildServiceItem(
+                            icon: Icons.work_rounded,
+                            label: 'Sewa Alat',
+                            bgColor: AppColors.purpleLight,
+                            iconColor: AppColors.purplePrimary,
+                            onTap: () {
+                              final id = wisataP.allWisata.isNotEmpty
+                                  ? wisataP.allWisata.first.id
+                                  : 1;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      SewaPeralatanScreen(wisataId: id),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 28),
+
+                      // ── Kategori dari API ──
+                      _buildSectionTitle('Kategori Wisata'),
+                      const SizedBox(height: 12),
+                      _buildKategoriChips(wisataP),
+                      const SizedBox(height: 28),
+
+                      // ── Destinasi Terpopuler dari API ──
+                      _buildSectionTitle('Destinasi Terpopuler'),
+                      const SizedBox(height: 16),
+                      _buildPopularList(wisataP),
+                      const SizedBox(height: 28),
+
+                      // ── Semua Wisata dari API ──
+                      _buildSectionTitle('Semua Destinasi'),
+                      const SizedBox(height: 8),
+                      _buildAllWisataList(wisataP),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Kategori Chips dari API ────────────────────────────────────────────
+  Widget _buildKategoriChips(WisataProvider wisataP) {
+    // Gabungkan "Semua" + kategori dari API
+    final chips = <String>['Semua', ...wisataP.kategoriList.map((k) => k.nama)];
+
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: chips.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final label = chips[i];
+          final isSelected = wisataP.kategoriAktif == label;
+          return ChoiceChip(
+            label: Text(label),
+            labelStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              color: isSelected ? Colors.white : AppColors.textPrimary,
+            ),
+            selected: isSelected,
+            selectedColor: AppColors.primaryGreen,
+            backgroundColor: Colors.white,
+            side: BorderSide(
+              color: isSelected ? Colors.transparent : AppColors.borderColor,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            onSelected: (_) {
+              wisataP.setKategori(label);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  // ── Daftar Populer dari API ────────────────────────────────────────────
+  Widget _buildPopularList(WisataProvider wisataP) {
+    if (wisataP.isLoading) {
+      return SizedBox(
+        height: 180,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: 3,
+          separatorBuilder: (_, __) => const SizedBox(width: 12),
+          itemBuilder: (_, __) => _buildSkeletonCard(),
+        ),
+      );
+    }
+
+    final list = wisataP.popularWisata.isNotEmpty
+        ? wisataP.popularWisata
+        : wisataP.allWisata;
+
+    if (list.isEmpty) {
+      return _buildEmptyState('Belum ada wisata tersedia');
+    }
+
+    return SizedBox(
+      height: 180,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: list.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, i) => _buildWisataCard(list[i]),
+      ),
+    );
+  }
+
+  // ── Semua Wisata dari API ──────────────────────────────────────────────
+  Widget _buildAllWisataList(WisataProvider wisataP) {
+    if (wisataP.isLoading) {
+      return Column(
+        children: List.generate(3, (_) => _buildSkeletonRow()),
+      );
+    }
+
+    final list = wisataP.filteredWisata;
+
+    if (list.isEmpty) {
+      if (wisataP.error != null) {
+        return _buildErrorState(wisataP.error!, () {
+          wisataP.loadWisata(refresh: true);
+        });
+      }
+      return _buildEmptyState('Belum ada destinasi untuk kategori ini');
+    }
+
+    return Column(
+      children: list.map((w) => _buildWisataRow(w)).toList(),
+    );
+  }
+
+  // ── Tab Jelajah ────────────────────────────────────────────────────────
+  Widget _buildJelajahTab() {
+    return Consumer<WisataProvider>(
+      builder: (_, provider, __) {
+        final list = provider.allWisata.where((w) {
+          return w.nama.toLowerCase().contains(_searchQuery.toLowerCase());
+        }).toList();
+
+        return Column(
+          children: [
+            // Search Header
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                MediaQuery.of(context).padding.top + 12,
+                16,
+                16,
+              ),
+              color: AppColors.primaryGreen,
+              child: TextField(
+                controller: _searchController,
+                onChanged: (val) => setState(() => _searchQuery = val),
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Cari destinasi alam pilihanmu...',
+                  hintStyle: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    color: AppColors.textMuted,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                    color: AppColors.textMuted,
+                    size: 22,
+                  ),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.cancel, size: 16),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: AppColors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
                 ),
               ),
             ),
 
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [Color(0xFF0F7133), Color(0xFF16A34A)]),
-                        borderRadius: BorderRadius.circular(16),
+            // Filter Kategori
+            Container(
+              height: 50,
+              padding: const EdgeInsets.only(top: 10),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  'Semua',
+                  ...provider.kategoriList.map((k) => k.nama),
+                ].map((label) {
+                  final isSelected = provider.kategoriAktif == label;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(
+                        label,
+                        style: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : AppColors.textPrimary,
+                          fontSize: 11.5,
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Diskon Spesial Camp!', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
-                          const SizedBox(height: 4),
-                          Text('Dapatkan potongan tiket hingga 20% khusus bulan ini.', style: GoogleFonts.plusJakartaSans(color: Colors.white70, fontSize: 12)),
-                        ],
-                      ),
+                      selected: isSelected,
+                      selectedColor: AppColors.primaryGreen,
+                      backgroundColor: Colors.white,
+                      onSelected: (_) => provider.setKategori(label),
                     ),
-                    const SizedBox(height: 28),
-
-                    _buildSectionTitle('Layanan CitiisGo'),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildServiceItem(
-                          icon: Icons.confirmation_number_rounded,
-                          label: 'Tiket Masuk',
-                          bgColor: AppColors.lightGreen,
-                          iconColor: AppColors.primaryGreen,
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingTiketScreen(wisataId: 1)));
-                          },
-                        ),
-                        _buildServiceItem(
-                          icon: Icons.home_rounded,
-                          label: 'Sewa Camp',
-                          bgColor: AppColors.lightOrange,
-                          iconColor: AppColors.primaryOrange,
-                          onTap: () {
-                            final targetId = wisataP.allWisata.isNotEmpty ? wisataP.allWisata.first.id : 1;
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => BookingCampingScreen(wisataId: targetId)));
-                          },
-                        ),
-                        _buildServiceItem(
-                          icon: Icons.business_rounded,
-                          label: 'Penginapan',
-                          bgColor: const Color(0xFFEFF6FF),
-                          iconColor: AppColors.info,
-                          onTap: () {
-                            final targetId = wisataP.allWisata.isNotEmpty ? wisataP.allWisata.first.id : 1;
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => BookingPenginapanScreen(wisataId: targetId)));
-                          },
-                        ),
-                        _buildServiceItem(
-                          icon: Icons.work_rounded,
-                          label: 'Sewa Alat',
-                          bgColor: AppColors.purpleLight,
-                          iconColor: AppColors.purplePrimary,
-                          onTap: () {
-                            final targetId = wisataP.allWisata.isNotEmpty ? wisataP.allWisata.first.id : 1;
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => SewaPeralatanScreen(wisataId: targetId)));
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 28),
-
-                    _buildSectionTitle('Kategori Wisata'),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 38,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        itemCount: _kategoriList.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, i) {
-                          final labelKategori = _kategoriList[i];
-                          final rawName = labelKategori.replaceAll(RegExp(r'[^\w\s]'), '').trim();
-                          final mappedKey = i == 0 ? 'Semua' : rawName;
-                          final isSelected = wisataP.kategoriAktif == mappedKey;
-
-                          return ChoiceChip(
-                            label: Text(labelKategori),
-                            labelStyle: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: isSelected ? Colors.white : AppColors.textPrimary,
-                            ),
-                            selected: isSelected,
-                            selectedColor: AppColors.primaryGreen,
-                            backgroundColor: Colors.white,
-                            side: BorderSide(color: isSelected ? Colors.transparent : AppColors.borderColor),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            onSelected: (_) {
-                              wisataP.setKategori(mappedKey);
-                              setState(() { _navIndex = 1; }); 
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-
-                    _buildSectionTitle('Destinasi Terpopuler'),
-                    const SizedBox(height: 16),
-                    _buildPopularList(wisataP),
-
-                    const SizedBox(height: 28),
-
-                    _buildSectionTitle('Rekomendasi Terdekat'),
-                    const SizedBox(height: 8),
-                    _buildNearbyList(wisataP),
-                  ],
-                ),
+                  );
+                }).toList(),
               ),
+            ),
+
+            // List Wisata dari API
+            Expanded(
+              child: provider.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaryGreen,
+                      ),
+                    )
+                  : list.isEmpty
+                      ? Center(
+                          child: Text(
+                            'Destinasi tidak ditemukan',
+                            style: GoogleFonts.plusJakartaSans(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: () =>
+                              provider.loadWisata(refresh: true),
+                          color: AppColors.primaryGreen,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            itemCount: list.length,
+                            itemBuilder: (_, i) =>
+                                _buildJelajahCard(list[i]),
+                          ),
+                        ),
             ),
           ],
         );
@@ -367,11 +688,299 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(title, style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.2));
+  // ── Widget Cards ───────────────────────────────────────────────────────
+  Widget _buildWisataCard(WisataModel w) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => WisataDetailScreen(wisataId: w.id),
+        ),
+      ),
+      child: Container(
+        width: 145,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+            )
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Cover dari API atau emoji fallback
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: w.cover != null
+                  ? Image.network(
+                      w.cover!,
+                      height: 90,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _buildEmojiCover(
+                        w.emoji ?? '🏔️',
+                        height: 90,
+                      ),
+                    )
+                  : _buildEmojiCover(w.emoji ?? '🏔️', height: 90),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              w.nama,
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w800,
+                fontSize: 12.5,
+                color: AppColors.textPrimary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              w.alamat,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '⭐ ${w.rating.toStringAsFixed(1)}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  CurrencyFormatter.formatShort(w.hargaTiket),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primaryGreen,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  Widget _buildServiceItem({required IconData icon, required String label, required Color bgColor, required Color iconColor, required VoidCallback onTap}) {
+  Widget _buildWisataRow(WisataModel w) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => WisataDetailScreen(wisataId: w.id),
+        ),
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderColor.withOpacity(0.4)),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: w.cover != null
+                  ? Image.network(
+                      w.cover!,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          _buildEmojiCover(w.emoji ?? '🏔️', size: 60),
+                    )
+                  : _buildEmojiCover(w.emoji ?? '🏔️', size: 60),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    w.nama,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '📍 ${w.alamat}',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '⭐ ${w.rating.toStringAsFixed(1)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        CurrencyFormatter.format(w.hargaTiket),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryGreen,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildJelajahCard(WisataModel w) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => WisataDetailScreen(wisataId: w.id),
+        ),
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.borderColor.withOpacity(0.4)),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: w.cover != null
+                  ? Image.network(
+                      w.cover!,
+                      width: 75,
+                      height: 75,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          _buildEmojiCover(w.emoji ?? '🏔️', size: 75),
+                    )
+                  : _buildEmojiCover(w.emoji ?? '🏔️', size: 75),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    w.nama,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '📍 ${w.alamat}',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Colors.amber,
+                        size: 15,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        w.rating.toStringAsFixed(1),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        CurrencyFormatter.formatShort(w.hargaTiket),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryGreen,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Helper Widgets ─────────────────────────────────────────────────────
+  Widget _buildEmojiCover(String emoji, {double? size, double? height}) {
+    return Container(
+      width: size,
+      height: size ?? height,
+      color: AppColors.lightGreen,
+      child: Center(
+        child: Text(emoji, style: TextStyle(fontSize: size != null ? size * 0.45 : 32)),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 15,
+        fontWeight: FontWeight.w800,
+        color: AppColors.textPrimary,
+        letterSpacing: -0.2,
+      ),
+    );
+  }
+
+  Widget _buildServiceItem({
+    required IconData icon,
+    required String label,
+    required Color bgColor,
+    required Color iconColor,
+    required VoidCallback onTap,
+  }) {
     return Expanded(
       child: InkWell(
         onTap: onTap,
@@ -382,12 +991,25 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 52, height: 52,
-                decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(14)),
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 child: Center(child: Icon(icon, color: iconColor, size: 24)),
               ),
               const SizedBox(height: 8),
-              Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 11.5, color: AppColors.textPrimary, fontWeight: FontWeight.w700), textAlign: TextAlign.center, maxLines: 1),
+              Text(
+                label,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11.5,
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+              ),
             ],
           ),
         ),
@@ -395,231 +1017,120 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildPopularList(WisataProvider provider) {
-    final listData = provider.popularWisata.isNotEmpty ? provider.popularWisata : _dummyWisataMaster;
-    return SizedBox(
-      height: 180,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: listData.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, i) => _buildWisataCardReal(listData[i]),
+  Widget _buildSkeletonCard() {
+    return Container(
+      width: 145,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Container(
+            height: 90,
+            decoration: BoxDecoration(
+              color: AppColors.borderColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(height: 12, color: AppColors.borderColor),
+          const SizedBox(height: 6),
+          Container(height: 10, width: 80, color: AppColors.borderColor),
+        ],
       ),
     );
   }
 
-  Widget _buildNearbyList(WisataProvider provider) {
-    final listData = provider.nearbyWisata.isNotEmpty ? provider.nearbyWisata : _dummyWisataMaster;
-    return Column(children: listData.map((w) => _buildNearbyRowReal(w)).toList());
-  }
-
-  Widget _buildWisataCardReal(WisataModel w) {
-    return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WisataDetailScreen(wisataId: w.id))),
-      child: Container(
-        width: 145, padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.white, 
-          borderRadius: BorderRadius.circular(16), 
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8)],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 90, 
-              width: double.infinity, 
-              decoration: BoxDecoration(color: AppColors.lightGreen, borderRadius: BorderRadius.circular(12)), 
-              child: Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 32))),
+  Widget _buildSkeletonRow() {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: AppColors.borderColor,
+              borderRadius: BorderRadius.circular(10),
             ),
-            const SizedBox(height: 8),
-            Text(w.nama, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 12.5, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 2),
-            Text(w.alamat ?? 'Tasikmalaya', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: AppColors.textSecondary)),
-            const Spacer(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('⭐ ${w.rating}', style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w700)),
-                Text(CurrencyFormatter.formatShort(w.hargaTiket), style: GoogleFonts.plusJakartaSans(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.primaryGreen)),
+                Container(height: 13, color: AppColors.borderColor),
+                const SizedBox(height: 6),
+                Container(height: 10, width: 120, color: AppColors.borderColor),
               ],
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNearbyRowReal(WisataModel w) {
-    return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WisataDetailScreen(wisataId: w.id))),
-      child: Container(
-        margin: const EdgeInsets.only(top: 10), padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-        child: Row(
-          children: [
-            Container(
-              width: 60, 
-              height: 60, 
-              decoration: BoxDecoration(color: AppColors.lightGreen, borderRadius: BorderRadius.circular(10)), 
-              child: Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 26))),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(w.nama, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textPrimary)),
-                  const SizedBox(height: 2),
-                  Text('📍 Kawasan Wisata Citiis — Tasikmalaya', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: AppColors.textSecondary)),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('⭐ ${w.rating}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                      Text(CurrencyFormatter.format(w.hargaTiket), style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primaryGreen)),
-                    ],
-                  )
-                ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String msg) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Center(
+        child: Column(
+          children: [
+            const Icon(Icons.map_outlined, size: 48, color: AppColors.borderColor),
+            const SizedBox(height: 12),
+            Text(
+              msg,
+              style: GoogleFonts.plusJakartaSans(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
               ),
-            )
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildJelajahTab() {
-    return Consumer<WisataProvider>(
-      builder: (_, provider, __) {
-        final List<WisataModel> poolData = provider.allWisata.isNotEmpty ? provider.allWisata : _dummyWisataMaster;
-
-        List<WisataModel> hasilFilter = poolData.where((w) {
-          final matchQuery = w.nama.toLowerCase().contains(_searchQuery.toLowerCase());
-          
-          if (provider.kategoriAktif == 'Semua') {
-            return matchQuery;
-          } else {
-            return matchQuery && (w.emoji == _petaEmojiKategori(provider.kategoriAktif));
-          }
-        }).toList();
-
-        return Column(
+  Widget _buildErrorState(String msg, VoidCallback onRetry) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Center(
+        child: Column(
           children: [
-            Container(
-              padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 12, 16, 16),
-              color: AppColors.primaryGreen,
-              child: TextField(
-                controller: _searchController,
-                onChanged: (val) {
-                  setState(() { _searchQuery = val; });
-                },
-                style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                decoration: InputDecoration(
-                  hintText: 'Cari destinasi alam pilihanmu...',
-                  hintStyle: GoogleFonts.plusJakartaSans(fontSize: 13, color: AppColors.textMuted),
-                  prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 22),
-                  suffixIcon: _searchQuery.isNotEmpty 
-                      ? IconButton(icon: const Icon(Icons.cancel, size: 16), onPressed: () { _searchController.clear(); setState(() { _searchQuery = ""; }); }) 
-                      : null,
-                  filled: true, fillColor: AppColors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            const Icon(Icons.wifi_off_rounded,
+                size: 48, color: AppColors.danger),
+            const SizedBox(height: 12),
+            Text(
+              msg,
+              style: GoogleFonts.plusJakartaSans(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Coba Lagi'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
             ),
-            
-            _buildQuickKategoriFilter(provider),
-
-            Expanded(
-              child: hasilFilter.isEmpty
-                ? Center(child: Text('Destinasi tidak ditemukan', style: GoogleFonts.plusJakartaSans(color: AppColors.textSecondary, fontWeight: FontWeight.w500)))
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16), 
-                    physics: const BouncingScrollPhysics(), 
-                    itemCount: hasilFilter.length,
-                    itemBuilder: (_, i) {
-                      final w = hasilFilter[i];
-                      return GestureDetector(
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WisataDetailScreen(wisataId: w.id))),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 14), padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.borderColor.withOpacity(0.4))),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 75, height: 75, 
-                                decoration: BoxDecoration(color: const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(14)), 
-                                child: Center(child: Text(w.emoji ?? '🏔️', style: const TextStyle(fontSize: 30))),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(w.nama, style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-                                    const SizedBox(height: 2),
-                                    Text('📍 ${w.alamat ?? "Tasikmalaya"}', style: GoogleFonts.plusJakartaSans(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.star_rounded, color: Colors.amber, size: 15),
-                                        const SizedBox(width: 2),
-                                        Text('${w.rating}', style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                                        const Spacer(),
-                                        Text(CurrencyFormatter.formatShort(w.hargaTiket), style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primaryGreen)),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-            ),
           ],
-        );
-      },
-    );
-  }
-
-  Widget _buildQuickKategoriFilter(WisataProvider wisataP) {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.only(top: 10),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _kategoriList.length,
-        itemBuilder: (ctx, i) {
-          final labelKategori = _kategoriList[i];
-          final rawName = labelKategori.replaceAll(RegExp(r'[^\w\s]'), '').trim();
-          final mappedKey = i == 0 ? 'Semua' : rawName;
-          final isSelected = wisataP.kategoriAktif == mappedKey;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(labelKategori, style: TextStyle(color: isSelected ? Colors.white : AppColors.textPrimary, fontSize: 11.5)),
-              selected: isSelected,
-              selectedColor: AppColors.primaryGreen,
-              backgroundColor: Colors.white,
-              onSelected: (_) => wisataP.setKategori(mappedKey),
-            ),
-          );
-        },
+        ),
       ),
     );
-  }
-
-  String _petaEmojiKategori(String kat) {
-    if (kat == 'Gunung') return '🌋';
-    if (kat == 'Air Terjun') return '💧';
-    if (kat == 'Pantai') return '🌊';
-    if (kat == 'Budaya') return '🏛️';
-    return '🏔️';
   }
 }
